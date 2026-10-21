@@ -154,6 +154,11 @@ ipcMain.handle('spotify:disconnect', () => {
   spotifyAuth.disconnect();
   return { connected: false };
 });
+ipcMain.handle('spotify:get-access-token', async () => {
+  // Used by the renderer both to init the Web Playback SDK and to call
+  // the Web API directly (library, playlists, search).
+  return spotifyAuth.getValidAccessToken();
+});
 
 app.whenReady().then(() => {
   createWindow();

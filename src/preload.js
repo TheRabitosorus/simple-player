@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('simplePlayer', {
 
   spotifyGetStatus: () => ipcRenderer.invoke('spotify:get-status'),
   spotifyConnect: () => ipcRenderer.invoke('spotify:connect'),
-  spotifyDisconnect: () => ipcRenderer.invoke('spotify:disconnect')
+  spotifyDisconnect: () => ipcRenderer.invoke('spotify:disconnect'),
+  spotifyGetAccessToken: () => ipcRenderer.invoke('spotify:get-access-token')
 });

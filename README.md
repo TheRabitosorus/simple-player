@@ -43,6 +43,9 @@ Les paramètres de connexion à Spotify : l'identifiant de l'application (Client
 ### `src/spotifyAuth.js`
 La vraie connexion à Spotify : ouvre la page de connexion officielle dans ton navigateur, reçoit la réponse via un petit serveur local temporaire, échange le code contre les jetons d'accès, et conserve le jeton de rafraîchissement **chiffré** sur ton disque (via le coffre-fort intégré de Windows) pour que tu n'aies pas à te reconnecter à chaque lancement.
 
+### Lecture réelle (dans `src/renderer/index.html`)
+Une fois connecté, l'app charge le "Web Playback SDK" officiel de Spotify, ce qui enregistre Simple Player comme un vrai appareil Spotify Connect (comme s'il s'agissait d'un haut-parleur ou d'un autre téléphone). Les boutons play/pause/suivant/précédent/volume/shuffle/repeat envoient alors de vraies commandes à Spotify, et l'affichage (pochette, titre, progression) se met à jour à partir de l'état réel renvoyé par Spotify — donc si tu changes de musique depuis ton téléphone, Simple Player le reflète automatiquement.
+
 ### `src/renderer/index.html`
 Toute l'interface que tu vois et utilises : la pochette d'album, les boutons de lecture, le swipe tactile, la barre de volume, la bibliothèque, la recherche, et les réglages. C'est ce fichier qui gère l'affichage et qui, une fois la connexion Spotify branchée, parlera à ton compte Spotify.
 
@@ -72,5 +75,5 @@ npm run dist
 - ✅ Interface complète et validée (lecteur, bibliothèque, recherche, réglages, swipe, icône)
 - ✅ Fenêtre Windows, tray, position mémorisée, raccourcis clavier, démarrage avec Windows, vérification de mise à jour
 - ✅ Connexion réelle à Spotify (OAuth) — bouton "Connect to Spotify" fonctionnel dans les réglages
-- ⏳ Lecture réelle de musique via Spotify (Web Playback SDK) — à venir
-- ⏳ Bibliothèque et recherche branchées sur ton vrai compte Spotify — à venir
+- ✅ Lecture réelle de musique via Spotify (Web Playback SDK) : play/pause/suivant/précédent/volume/shuffle/repeat/progression/pochette réelle, synchronisé avec l'état réel de Spotify (fonctionne même si tu changes de piste depuis ton téléphone)
+- ⏳ Bibliothèque et recherche branchées sur ton vrai compte Spotify — actuellement encore des données fictives de démonstration
