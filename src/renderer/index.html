@@ -37,7 +37,7 @@ body{
 button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .px{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));}
 
-#app{height:100%;display:flex;flex-direction:column;}
+#app{height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* ---------- Title bar ---------- */
 #titlebar{
@@ -97,8 +97,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #transport,#app.idle #addToLibraryWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 #app.idle #volumeRail{opacity:0;pointer-events:none;}
-#app.idle #art{width:min(80vw,70vh,560px);height:min(80vw,70vh,560px);}
-#art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
+#app.idle #art{width:min(80vw,560px);}
+#art{transition:width .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
 @keyframes swipeNext{0%{transform:translateX(0);opacity:1;}45%{transform:translateX(-26px);opacity:.4;}46%{transform:translateX(26px);}100%{transform:translateX(0);opacity:1;}}
@@ -108,14 +108,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .liked-badge svg{width:22px;height:22px;flex:0 0 auto;}
 .liked-badge.on{color:var(--accent);}
 
+/* artWrap takes exactly whatever vertical space is left over after its
+   siblings (liked badge, track info, progress, transport, add-to-library)
+   take their own natural size, then centers #art inside it. #art is sized
+   by width, with aspect-ratio deriving the height and max-height:100%
+   capping it to whatever room artWrap actually has — so at any window
+   size or any interface zoom level, the cover art shrinks to fit instead
+   of overflowing past neighboring controls. */
+#artWrap{flex:1 1 auto;min-height:0;min-width:0;display:flex;align-items:center;justify-content:center;width:100%;}
 #art{
-  width:min(62vw,58vh,380px);
-  height:min(62vw,58vh,380px);
+  width:min(62vw,380px);
+  aspect-ratio:1;
+  max-width:100%;
+  max-height:100%;
   border-radius:18px;
   background-size:cover;background-position:center;
   position:relative;
   box-shadow:0 18px 50px -14px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.06);
-  flex:0 0 auto;
   cursor:pointer;
 }
 #art .art-overlay{
@@ -268,10 +277,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Tab bar ---------- */
 #tabbar{
-  flex:0 0 auto;background:var(--bg-elev);border-top:1px solid var(--border);
+  background:var(--bg-elev);border-top:1px solid var(--border);
   padding-bottom:max(10px, env(safe-area-inset-bottom,0px));padding-top:8px;
 }
-#tabbar{position:relative;}
+/* Hidden by default everywhere, floating over the content rather than
+   reserving permanent space in the layout; revealed by swiping up from
+   the handle at the bottom edge. */
+#tabbar{
+  position:absolute;left:0;right:0;bottom:0;z-index:6;
+  transform:translateY(100%);
+  transition:transform .32s cubic-bezier(.22,.61,.36,1), opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;
+  pointer-events:none;
+}
+#app.tabbar-revealed #tabbar{transform:translateY(0);pointer-events:auto;}
+/* Thin always-present strip at the very bottom edge that catches the
+   swipe-up-to-reveal gesture, even while the tab bar itself is hidden
+   and non-interactive. Sits above view content but below the tab bar. */
+#tabbarHandle{position:absolute;left:0;right:0;bottom:0;height:22px;z-index:5;touch-action:none;}
 #tabbar .px{display:flex;justify-content:center;gap:clamp(24px,10vw,70px);}
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
@@ -320,9 +342,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         <div id="likedBadge" class="liked-badge" title="Not liked">
           <svg id="likedIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8 12.5 10.5 15 16 9"/></svg>
         </div>
-        <div id="art">
-          <div class="art-overlay" id="artOverlay">
-            <svg id="artOverlayIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+        <div id="artWrap">
+          <div id="art">
+            <div class="art-overlay" id="artOverlay">
+              <svg id="artOverlayIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            </div>
           </div>
         </div>
         <div id="trackInfo">
@@ -491,6 +515,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
   </nav>
+
+  <div id="tabbarHandle" aria-hidden="true"></div>
 
 </div>
 
@@ -687,6 +713,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // falls back to the local simulation until then.
   var useRealPlayback = false;
   var onVolumeChange = null; // wired to the real Spotify API once connected
+  var updateVolumeDisplay = null; // set by the volume rail; also used by the swipe-to-adjust-volume gesture
 
   // ---------------- DOM refs ----------------
   var $art = document.getElementById('art');
@@ -886,6 +913,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var zone = document.getElementById('swipeZone');
     var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
+    var startVolume = 0;
+    var lastTapTime = 0;
 
     function noTransition(){ $art.style.transition = 'none'; }
     function releaseToCss(expectedGen, delay){
@@ -897,6 +926,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       genId++;
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
+      startVolume = state.volume;
       try { zone.setPointerCapture(pid); } catch(err){}
       noTransition();
     }
@@ -905,6 +935,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var dx = e.clientX - startX, dy = e.clientY - startY;
       if (locked === null){
         if (Math.abs(dx) > 6 || Math.abs(dy) > 6) locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      }
+      if (locked === 'y'){
+        // Drag up raises the volume, drag down lowers it — 220px of travel
+        // covers the full 0–100% range.
+        var deltaVol = -(dy / 220) * 100;
+        state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
+        if (updateVolumeDisplay) updateVolumeDisplay();
+        if (onVolumeChange) onVolumeChange(state.volume);
+        return;
       }
       if (locked !== 'x') return;
       noTransition();
@@ -948,6 +987,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         var dx = e.clientX - startX;
         if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
         else snapBack();
+      } else if (locked === null){
+        // A tap, not a drag. Each tap still toggles play/pause on its own
+        // (via #art's click listener below) — this only additionally
+        // tracks whether two taps landed close together in time, which is
+        // the one thing allowed to dismiss immersive mode. Toggling twice
+        // cancels out, so a double-tap leaves playback state unchanged.
+        var now = Date.now();
+        if (now - lastTapTime < 350){
+          lastTapTime = 0;
+          idle.exitIdle();
+        } else {
+          lastTapTime = now;
+        }
       }
       locked = null;
     }
@@ -1001,6 +1053,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       render();
       notifyVolumeChange();
     });
+    updateVolumeDisplay = render; // shared with the swipe-up/down-on-art volume gesture
     render();
   })();
 
@@ -1074,6 +1127,46 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
   })();
 
+  // ---------------- Barre Player/Library/Search (masquée par défaut) ----------------
+  // Hidden everywhere by default (see #tabbar's CSS); revealed only by
+  // swiping up from the thin handle at the very bottom edge of the
+  // window, so it never competes with the swipe-up/down-for-volume
+  // gesture on the cover art above it.
+  (function(){
+    var app = document.getElementById('app');
+    var handle = document.getElementById('tabbarHandle');
+    var tabbar = document.getElementById('tabbar');
+    var hideTimer = null;
+    var startY = null, dragging = false;
+
+    function reveal(){
+      app.classList.add('tabbar-revealed');
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(hide, 4000);
+    }
+    function hide(){
+      app.classList.remove('tabbar-revealed');
+      if (hideTimer){ clearTimeout(hideTimer); hideTimer = null; }
+    }
+
+    handle.addEventListener('pointerdown', function(e){
+      dragging = true; startY = e.clientY;
+      try { handle.setPointerCapture(e.pointerId); } catch(err){}
+    });
+    handle.addEventListener('pointermove', function(e){
+      if (!dragging) return;
+      if (startY - e.clientY > 18) { reveal(); dragging = false; }
+    });
+    handle.addEventListener('pointerup', function(){ dragging = false; });
+    handle.addEventListener('pointercancel', function(){ dragging = false; });
+
+    // Interacting with the bar itself (picking a tab, opening Settings)
+    // extends the auto-hide timer instead of letting it vanish mid-use.
+    tabbar.addEventListener('pointerdown', function(){
+      if (app.classList.contains('tabbar-revealed')) reveal();
+    });
+  })();
+
   // ---------------- Mode immersif (masque l'UI après 3s d'inactivité) ----------------
   var idle = (function(){
     var app = document.getElementById('app');
@@ -1085,14 +1178,25 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       timer = setTimeout(function(){ if (isPlayerActive()) app.classList.add('idle'); }, settings.idleDelay);
     }
     function activity(){
+      // Keeps the idle timer from firing while the user is actively using
+      // the app, but — by design — does NOT dismiss immersive mode once
+      // it has already engaged; only an explicit double-tap on the cover
+      // art does that (see the swipe gesture handler below), so a stray
+      // mouse move, key press, or scroll doesn't interrupt it.
       if (!isPlayerActive()){ clear(); return; }
+      if (app.classList.contains('idle')) return;
+      schedule();
+    }
+    function exitIdle(){
+      // Explicit dismissal (double-tap). Unlike clear(), this re-arms the
+      // timer so immersive mode can re-engage after another idle period.
       app.classList.remove('idle');
       schedule();
     }
     ['pointerdown','pointermove','keydown','wheel'].forEach(function(ev){
       document.addEventListener(ev, activity, {passive:true});
     });
-    return { activity: activity, clear: clear };
+    return { activity: activity, clear: clear, exitIdle: exitIdle };
   })();
 
   // ---------------- Réglages : groupes de pilules ----------------
