@@ -8,9 +8,28 @@ const store = new Store({
   defaults: {
     windowBounds: { width: 480, height: 760, x: undefined, y: undefined },
     windowMaximized: false,
-    launchAtStartup: false
+    launchAtStartup: false,
+    zoomFactor: 1.0
   }
 });
+
+const ZOOM_MIN = 0.7;
+const ZOOM_MAX = 2.0;
+const ZOOM_STEP = 0.1;
+
+function clampZoom(z) {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 100) / 100));
+}
+
+function setZoomFactor(factor) {
+  const clamped = clampZoom(factor);
+  store.set('zoomFactor', clamped);
+  if (mainWindow) {
+    mainWindow.webContents.setZoomFactor(clamped);
+    mainWindow.webContents.send('zoom:changed', clamped);
+  }
+  return clamped;
+}
 
 let mainWindow = null;
 let tray = null;
@@ -43,10 +62,20 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.webContents.setZoomFactor(store.get('zoomFactor'));
 
   if (store.get('windowMaximized')) {
     mainWindow.maximize();
   }
+
+  // Ctrl+molette, comme dans n'importe quelle fenêtre Chromium (Chrome,
+  // Edge...). Electron expose directement cet événement — pas besoin de
+  // l'intercepter nous-mêmes.
+  mainWindow.webContents.on('zoom-changed', (event, zoomDirection) => {
+    const current = mainWindow.webContents.getZoomFactor();
+    const next = zoomDirection === 'in' ? current + ZOOM_STEP : current - ZOOM_STEP;
+    setZoomFactor(next);
+  });
 
   // Persist window position/size/maximized state as the user moves,
   // resizes, or closes the window, so it reopens exactly where it was.
@@ -78,6 +107,21 @@ function createWindow() {
   // (never registered as OS-wide globalShortcut media keys).
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
+    if (input.control && (input.key === '=' || input.key === '+')) {
+      setZoomFactor(mainWindow.webContents.getZoomFactor() + ZOOM_STEP);
+      event.preventDefault();
+      return;
+    }
+    if (input.control && input.key === '-') {
+      setZoomFactor(mainWindow.webContents.getZoomFactor() - ZOOM_STEP);
+      event.preventDefault();
+      return;
+    }
+    if (input.control && input.key === '0') {
+      setZoomFactor(1.0);
+      event.preventDefault();
+      return;
+    }
     if (input.key === ' ') {
       mainWindow.webContents.send('shortcut:toggle-play');
       event.preventDefault();
@@ -133,6 +177,9 @@ function setLaunchAtStartup(enabled) {
     path: process.execPath
   });
 }
+
+ipcMain.handle('display:get-zoom-factor', () => store.get('zoomFactor'));
+ipcMain.handle('display:set-zoom-factor', (event, factor) => setZoomFactor(factor));
 
 ipcMain.handle('settings:get-launch-at-startup', () => store.get('launchAtStartup'));
 ipcMain.handle('settings:set-launch-at-startup', (event, enabled) => {

@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   getLaunchAtStartup: () => ipcRenderer.invoke('settings:get-launch-at-startup'),
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke('settings:set-launch-at-startup', enabled),
 
+  getZoomFactor: () => ipcRenderer.invoke('display:get-zoom-factor'),
+  setZoomFactor: (factor) => ipcRenderer.invoke('display:set-zoom-factor', factor),
+  onZoomChanged: (callback) => ipcRenderer.on('zoom:changed', (event, factor) => callback(factor)),
+
   spotifyGetStatus: () => ipcRenderer.invoke('spotify:get-status'),
   spotifyConnect: () => ipcRenderer.invoke('spotify:connect'),
   spotifyDisconnect: () => ipcRenderer.invoke('spotify:disconnect'),

@@ -98,7 +98,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 #app.idle #volumeRail{opacity:0;pointer-events:none;}
 #app.idle #art{width:min(80vw,70vh,560px);height:min(80vw,70vh,560px);}
-#art{transition:width .4s ease, height .4s ease;}
+#art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
 @keyframes swipeNext{0%{transform:translateX(0);opacity:1;}45%{transform:translateX(-26px);opacity:.4;}46%{transform:translateX(26px);}100%{transform:translateX(0);opacity:1;}}
@@ -436,6 +436,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         </div>
 
         <div class="lib-section">
+          <h3>Interface size</h3>
+          <p class="settings-desc">Makes all text and buttons bigger or smaller. You can also hold Ctrl and scroll (or press Ctrl +/-/0), just like in a Chrome window.</p>
+          <div class="pill-group" id="zoomGroup">
+            <button class="pill" data-value="1">Normal</button>
+            <button class="pill" data-value="1.2">Large</button>
+            <button class="pill" data-value="1.45">Extra large</button>
+          </div>
+        </div>
+
+        <div class="lib-section">
           <h3>Background</h3>
           <p class="settings-desc">Tints the Now Playing screen with the cover art's dominant colors, like Spotify.</p>
           <div class="pill-group" id="bgToggleGroup">
@@ -593,8 +603,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         window.simplePlayer.spotifyConnect().then(function(res){
           connecting = false;
           setStatus(res.connected);
-          if (res.connected && typeof bootstrapSpotifyPlayback === 'function' && !useRealPlayback) {
-            bootstrapSpotifyPlayback();
+          if (res.connected && typeof startPolling === 'function' && !useRealPlayback) {
+            startPolling();
           }
           if (!res.connected && res.error) {
             noteEl.textContent = 'Connection failed: ' + res.error;
@@ -673,12 +683,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     timer: null
   };
 
-  // Set by bootstrapSpotifyPlayback() once the real Web Playback SDK is
-  // connected; everything below falls back to the local simulation until then.
+  // Set by startPolling() once connected to Spotify; everything below
+  // falls back to the local simulation until then.
   var useRealPlayback = false;
-  var spotifyPlayer = null;
-  var spotifyDeviceId = null;
-  var onVolumeChange = null; // wired to the Spotify SDK by bootstrapSpotifyPlayback()
+  var onVolumeChange = null; // wired to the real Spotify API once connected
 
   // ---------------- DOM refs ----------------
   var $art = document.getElementById('art');
@@ -755,7 +763,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function play(){
-    if (useRealPlayback){ if (spotifyPlayer) spotifyPlayer.resume().catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/play', { method: 'PUT' }).catch(function(){}); return; }
     if (state.playing) return;
     state.playing = true;
     setPlayIcon(true);
@@ -781,7 +789,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function pause(){
-    if (useRealPlayback){ if (spotifyPlayer) spotifyPlayer.pause().catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){}); return; }
     state.playing = false;
     setPlayIcon(false);
     if (state.timer){ clearInterval(state.timer); state.timer = null; }
@@ -807,7 +815,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function next(auto, skipShake){
-    if (useRealPlayback){ if (spotifyPlayer) spotifyPlayer.nextTrack().catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/next', { method: 'POST' }).then(pollPlaybackState).catch(function(){}); return; }
     state.index = pickNextIndex();
     renderTrack();
     if (!auto && !skipShake){
@@ -818,7 +826,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     renderLibraryPlayingState();
   }
   function prev(skipShake){
-    if (useRealPlayback){ if (spotifyPlayer) spotifyPlayer.previousTrack().catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/previous', { method: 'POST' }).then(pollPlaybackState).catch(function(){}); return; }
     state.index = pickPrevIndex();
     renderTrack();
     if (!skipShake){
@@ -832,8 +840,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function toggleShuffle(){
     if (useRealPlayback){
       var next = !$shuffleBtn.classList.contains('on');
-      spotifyApi('/me/player/shuffle?state=' + next + (spotifyDeviceId ? '&device_id=' + spotifyDeviceId : ''), { method: 'PUT' }).catch(function(){});
-      return; // UI reflects the resulting player_state_changed event
+      spotifyApi('/me/player/shuffle?state=' + next, { method: 'PUT' }).then(pollPlaybackState).catch(function(){});
+      return; // UI reflects the next poll of the real state
     }
     state.shuffle = !state.shuffle;
     $shuffleBtn.classList.toggle('on', state.shuffle);
@@ -842,7 +850,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (useRealPlayback){
       var isOn = $repeatBtn.classList.contains('on');
       var newState = isOn ? 'off' : 'context';
-      spotifyApi('/me/player/repeat?state=' + newState + (spotifyDeviceId ? '&device_id=' + spotifyDeviceId : ''), { method: 'PUT' }).catch(function(){});
+      spotifyApi('/me/player/repeat?state=' + newState, { method: 'PUT' }).then(pollPlaybackState).catch(function(){});
       return;
     }
     state.repeat = !state.repeat;
@@ -861,9 +869,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var r = $progressBar.getBoundingClientRect();
     var pct = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
     if (useRealPlayback){
-      if (!spotifyPlayer || !realPlaybackMeta.durationMs) return;
+      if (!realPlaybackMeta.durationMs) return;
       var positionMs = Math.round(pct * realPlaybackMeta.durationMs);
-      spotifyPlayer.seek(positionMs).catch(function(){});
+      spotifyApi('/me/player/seek?position_ms=' + positionMs, { method: 'PUT' }).catch(function(){});
+      state.elapsed = positionMs / 1000; // reflect immediately; next poll confirms
+      renderRealProgress();
       return;
     }
     var t = currentTrack(); if (!t) return;
@@ -875,11 +885,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   (function(){
     var zone = document.getElementById('swipeZone');
     var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
+    var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
 
     function noTransition(){ $art.style.transition = 'none'; }
+    function releaseToCss(expectedGen, delay){
+      setTimeout(function(){ if (genId === expectedGen) $art.style.transition = ''; }, delay);
+    }
 
     function onDown(e){
       if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap')) return;
+      genId++;
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
       try { zone.setPointerCapture(pid); } catch(err){}
@@ -912,12 +927,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         $art.style.transition = 'transform .32s cubic-bezier(.2,.7,.3,1), opacity .32s ease';
         $art.style.transform = 'translateX(0)';
         $art.style.opacity = '1';
+        // Hand control back to the stylesheet once this entrance animation
+        // settles, so the idle-mode width/height zoom (defined in CSS, not
+        // here) animates smoothly instead of snapping — an inline
+        // `transition` left set from the swipe would otherwise silently
+        // override it indefinitely.
+        releaseToCss(genId, 340);
       }, 220);
     }
     function snapBack(){
       $art.style.transition = 'transform .25s cubic-bezier(.2,.7,.3,1), opacity .25s ease';
       $art.style.transform = 'translateX(0)';
       $art.style.opacity = '1';
+      releaseToCss(genId, 260);
     }
     function onUp(e){
       if (!dragging) return;
@@ -1109,6 +1131,43 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (window.simplePlayer) window.simplePlayer.setLaunchAtStartup(settings.startup);
   });
 
+  // ---------------- Interface size (zoom) ----------------
+  // Mirrors Ctrl+scroll / Ctrl +/-/0 in main.js: both drive the same
+  // underlying Chromium zoom factor, so whichever one the user used last
+  // is reflected here, and vice versa.
+  (function(){
+    var group = document.getElementById('zoomGroup');
+    if (!group) return;
+    var buttons = group.querySelectorAll('.pill');
+
+    function highlight(factor){
+      var closest = buttons[0], closestDiff = Infinity;
+      buttons.forEach(function(b){
+        var diff = Math.abs(parseFloat(b.dataset.value) - factor);
+        if (diff < closestDiff){ closestDiff = diff; closest = b; }
+      });
+      buttons.forEach(function(b){ b.classList.toggle('active', b === closest); });
+    }
+
+    buttons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var factor = parseFloat(btn.dataset.value);
+        if (window.simplePlayer && window.simplePlayer.setZoomFactor) {
+          window.simplePlayer.setZoomFactor(factor).then(highlight);
+        } else {
+          highlight(factor); // preview only: no real zoom available here
+        }
+      });
+    });
+
+    if (window.simplePlayer && window.simplePlayer.getZoomFactor) {
+      window.simplePlayer.getZoomFactor().then(highlight);
+      window.simplePlayer.onZoomChanged(highlight);
+    } else {
+      highlight(1);
+    }
+  })();
+
   // In the real Windows app, read back the actual OS-level setting on
   // launch (it could differ if the user changed it outside Simple Player).
   if (window.simplePlayer) {
@@ -1238,14 +1297,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }catch(e){}
   });
 
-  // ---------------- Real Spotify playback (Web Playback SDK) ----------------
-  // Everything in this block only runs in the real Electron app, once the
-  // user is connected. It registers Simple Player as an actual Spotify
-  // Connect device and drives the UI from player_state_changed — never
-  // from a locally simulated clock — so play state stays correct even
-  // when playback is started or changed from another device.
+  // ---------------- Real Spotify playback (account-wide remote control) ----------------
+  // Simple Player works as a remote control + display for whatever is
+  // currently playing on the account — on a phone, a speaker, this PC, or
+  // anywhere else — exactly like opening the official Spotify app on a
+  // device that isn't producing the sound itself. Transport commands
+  // (play/pause/next/previous/seek/volume/shuffle/repeat) are sent without
+  // targeting a specific device, so they act on whichever device is
+  // currently active; and the real playback state (track, position,
+  // shuffle/repeat, context) is read back by polling the Web API every
+  // couple of seconds, which is the only way to see what's playing on a
+  // device other than this one — the Web Playback SDK's events only ever
+  // report this device's own state, not the account's.
   var realPlaybackMeta = { durationMs: 0, trackId: null, trackUri: null, contextUri: null };
   var realProgressTimer = null;
+  var pollTimer = null;
   var playlistNameCache = {};
 
   async function spotifyApi(path, options){
@@ -1315,71 +1381,64 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBackground.style.transform = 'scale(1.2)';
   }
 
+  var lastKnownTrackId = null;
+
   function renderRealTrack(s){
-    if (!s || !s.track_window || !s.track_window.current_track) return;
-    var t = s.track_window.current_track;
-    var artists = t.artists.map(function(a){ return a.name; }).join(', ');
-    var artUrl = t.album && t.album.images && t.album.images[0] ? t.album.images[0].url : '';
-    if (artUrl) $art.style.backgroundImage = "url('" + artUrl + "')";
-    $title.textContent = t.name;
-    $artist.textContent = artists;
-    realPlaybackMeta.durationMs = s.duration;
+    // s is the raw object returned by GET /me/player (a
+    // "CurrentlyPlayingContext"), not the Web Playback SDK's shape.
+    if (!s || !s.item) {
+      // Nothing playing anywhere on the account right now.
+      state.playing = false;
+      setPlayIcon(false);
+      return;
+    }
+    var t = s.item;
+    var isNewTrack = t.id !== lastKnownTrackId;
+    lastKnownTrackId = t.id;
+
+    if (isNewTrack) {
+      var artists = (t.artists || []).map(function(a){ return a.name; }).join(', ');
+      var artUrl = t.album && t.album.images && t.album.images[0] ? t.album.images[0].url : '';
+      if (artUrl) $art.style.backgroundImage = "url('" + artUrl + "')";
+      $title.textContent = t.name;
+      $artist.textContent = artists;
+      $total.textContent = fmt(t.duration_ms / 1000);
+      updateNpBackgroundReal(artUrl);
+      updateRealLikedBadge(t.id);
+    }
+
+    realPlaybackMeta.durationMs = t.duration_ms;
     realPlaybackMeta.trackId = t.id;
     realPlaybackMeta.trackUri = t.uri;
     realPlaybackMeta.contextUri = s.context && s.context.uri;
-    $total.textContent = fmt(s.duration / 1000);
-    state.elapsed = s.position / 1000;
-    state.playing = !s.paused;
+    state.elapsed = s.progress_ms / 1000;
+    state.playing = !!s.is_playing;
     setPlayIcon(state.playing);
     renderRealProgress();
-    $shuffleBtn.classList.toggle('on', !!s.shuffle);
-    $repeatBtn.classList.toggle('on', s.repeat_mode === 1 || s.repeat_mode === 2);
-    updateNpBackgroundReal(artUrl);
+    $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
+    $repeatBtn.classList.toggle('on', s.repeat_state === 'context' || s.repeat_state === 'track');
     updateRealPlaylistBadge(realPlaybackMeta.contextUri);
-    updateRealLikedBadge(t.id);
     startRealProgressTimer();
   }
 
-  function bootstrapSpotifyPlayback(){
-    var script = document.createElement('script');
-    script.src = 'https://sdk.scdn.co/spotify-player.js';
-    document.head.appendChild(script);
-
-    window.onSpotifyWebPlaybackSDKReady = function(){
-      spotifyPlayer = new Spotify.Player({
-        name: 'Simple Player',
-        getOAuthToken: function(cb){ window.simplePlayer.spotifyGetAccessToken().then(cb); },
-        volume: state.volume / 100
-      });
-
-      spotifyPlayer.addListener('ready', function(data){
-        spotifyDeviceId = data.device_id;
-        useRealPlayback = true;
-        // Make this the active Spotify Connect device without forcing
-        // playback to start — the user picks what to play from the
-        // (still simulated, for now) library/search views.
-        spotifyApi('/me/player', {
-          method: 'PUT',
-          body: JSON.stringify({ device_ids: [spotifyDeviceId], play: false })
-        }).catch(function(){ /* fine if nothing was playing anywhere yet */ });
-      });
-      spotifyPlayer.addListener('not_ready', function(){ useRealPlayback = false; });
-      spotifyPlayer.addListener('initialization_error', function(e){ console.error('Spotify init error', e); });
-      spotifyPlayer.addListener('authentication_error', function(e){ console.error('Spotify auth error', e); });
-      spotifyPlayer.addListener('account_error', function(e){ console.error('Spotify account error — Premium required', e); });
-      spotifyPlayer.addListener('player_state_changed', renderRealTrack);
-
-      spotifyPlayer.connect();
-    };
-
-    onVolumeChange = function(vol){
-      if (useRealPlayback && spotifyPlayer) spotifyPlayer.setVolume(vol / 100).catch(function(){});
-    };
+  function pollPlaybackState(){
+    return spotifyApi('/me/player').then(renderRealTrack).catch(function(){ /* transient network hiccup: next poll retries */ });
   }
+
+  function startPolling(){
+    useRealPlayback = true;
+    pollPlaybackState();
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollPlaybackState, 2000);
+  }
+
+  onVolumeChange = function(vol){
+    if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
+  };
 
   if (window.simplePlayer && window.simplePlayer.spotifyGetStatus) {
     window.simplePlayer.spotifyGetStatus().then(function(connected){
-      if (connected) bootstrapSpotifyPlayback();
+      if (connected) startPolling();
     });
   }
 
