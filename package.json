@@ -1,6 +1,6 @@
 {
   "name": "simple-player",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lecteur Spotify minimaliste pour Windows - gros boutons, tactile, swipe",
   "main": "src/main.js",
   "author": "Julien",

@@ -8,5 +8,9 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   onNextTrack: (callback) => ipcRenderer.on('shortcut:next-track', callback),
 
   getLaunchAtStartup: () => ipcRenderer.invoke('settings:get-launch-at-startup'),
-  setLaunchAtStartup: (enabled) => ipcRenderer.invoke('settings:set-launch-at-startup', enabled)
+  setLaunchAtStartup: (enabled) => ipcRenderer.invoke('settings:set-launch-at-startup', enabled),
+
+  spotifyGetStatus: () => ipcRenderer.invoke('spotify:get-status'),
+  spotifyConnect: () => ipcRenderer.invoke('spotify:connect'),
+  spotifyDisconnect: () => ipcRenderer.invoke('spotify:disconnect')
 });

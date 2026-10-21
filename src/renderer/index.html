@@ -411,7 +411,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             </span>
             <a id="connectSpotifyBtn" class="connect-btn" href="#" target="_blank" rel="noopener">Connect to Spotify</a>
           </div>
-          <p class="settings-note">This opens Spotify's real, official sign-in page in a new tab — the same one the Spotify app uses. This preview can't finish the connection afterward (there's no backend running here to catch the reply), but the real Windows app will complete it automatically and bring you back signed in.</p>
+          <p class="settings-note" id="spotifyNote">This opens Spotify's real, official sign-in page in a new tab — the same one the Spotify app uses. This preview can't finish the connection afterward (there's no backend running here to catch the reply), but the real Windows app will complete it automatically and bring you back signed in.</p>
         </div>
 
         <div class="lib-section">
@@ -558,49 +558,90 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     return url;
   }
 
-  // ---------------- Spotify OAuth (PKCE) — real official login link ----------------
+  // ---------------- Spotify connection ----------------
   (function(){
-    var CLIENT_ID = '201a8f9dcd014f9ab04024cd9cb1115a';
-    var REDIRECT_URI = 'http://127.0.0.1:8888/callback';
-    var SCOPES = [
-      'streaming','user-read-email','user-read-private',
-      'user-read-playback-state','user-modify-playback-state','user-read-currently-playing',
-      'user-library-read','user-library-modify',
-      'playlist-read-private','playlist-read-collaborative'
-    ].join(' ');
-
-    function base64UrlEncode(buffer){
-      var bytes = new Uint8Array(buffer);
-      var binary = '';
-      for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-    function randomToken(len){
-      var arr = new Uint8Array(len);
-      crypto.getRandomValues(arr);
-      return base64UrlEncode(arr.buffer);
-    }
-    function sha256(str){
-      var data = new TextEncoder().encode(str);
-      return crypto.subtle.digest('SHA-256', data).then(base64UrlEncode);
-    }
-
     var link = document.getElementById('connectSpotifyBtn');
-    if (!link || !window.crypto || !window.crypto.subtle) return;
+    var statusEl = document.getElementById('accountStatus');
+    var noteEl = document.getElementById('spotifyNote');
+    if (!link) return;
 
-    var verifier = randomToken(64);
-    sha256(verifier).then(function(challenge){
-      var params = new URLSearchParams({
-        client_id: CLIENT_ID,
-        response_type: 'code',
-        redirect_uri: REDIRECT_URI,
-        code_challenge_method: 'S256',
-        code_challenge: challenge,
-        scope: SCOPES,
-        state: randomToken(16)
+    function setStatus(connected){
+      statusEl.classList.toggle('connected', connected);
+      statusEl.innerHTML = '<span class="status-dot"></span>' + (connected ? 'Connected' : 'Not connected');
+      link.textContent = connected ? 'Disconnect' : 'Connect to Spotify';
+    }
+
+    if (window.simplePlayer && window.simplePlayer.spotifyGetStatus) {
+      // Real app: the whole login flow (browser window, local callback
+      // server, token exchange) happens in main.js — this button just
+      // triggers it and reflects the result.
+      noteEl.textContent = 'Opens Spotify’s official sign-in page in your browser. Come back here once you’ve logged in.';
+      var connecting = false;
+
+      window.simplePlayer.spotifyGetStatus().then(setStatus);
+
+      link.addEventListener('click', function(e){
+        e.preventDefault();
+        if (connecting) return;
+        var isConnected = statusEl.classList.contains('connected');
+        if (isConnected) {
+          window.simplePlayer.spotifyDisconnect().then(function(res){ setStatus(res.connected); });
+          return;
+        }
+        connecting = true;
+        link.textContent = 'Connecting…';
+        window.simplePlayer.spotifyConnect().then(function(res){
+          connecting = false;
+          setStatus(res.connected);
+          if (!res.connected && res.error) {
+            noteEl.textContent = 'Connection failed: ' + res.error;
+          }
+        });
       });
-      link.href = 'https://accounts.spotify.com/authorize?' + params.toString();
-    }).catch(function(){ /* leave href as "#" if crypto fails */ });
+    } else {
+      // Mockup/preview only (no Electron main process to catch the
+      // redirect): build the real Spotify authorize URL so the login
+      // screen itself can still be tested, but it can't complete here.
+      var CLIENT_ID = '201a8f9dcd014f9ab04024cd9cb1115a';
+      var REDIRECT_URI = 'http://127.0.0.1:8888/callback';
+      var SCOPES = [
+        'streaming','user-read-email','user-read-private',
+        'user-read-playback-state','user-modify-playback-state','user-read-currently-playing',
+        'user-library-read','user-library-modify',
+        'playlist-read-private','playlist-read-collaborative'
+      ].join(' ');
+
+      function base64UrlEncode(buffer){
+        var bytes = new Uint8Array(buffer);
+        var binary = '';
+        for (var i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+      function randomToken(len){
+        var arr = new Uint8Array(len);
+        crypto.getRandomValues(arr);
+        return base64UrlEncode(arr.buffer);
+      }
+      function sha256(str){
+        var data = new TextEncoder().encode(str);
+        return crypto.subtle.digest('SHA-256', data).then(base64UrlEncode);
+      }
+
+      if (!window.crypto || !window.crypto.subtle) return;
+      var verifier = randomToken(64);
+      sha256(verifier).then(function(challenge){
+        var params = new URLSearchParams({
+          client_id: CLIENT_ID,
+          response_type: 'code',
+          redirect_uri: REDIRECT_URI,
+          code_challenge_method: 'S256',
+          code_challenge: challenge,
+          scope: SCOPES,
+          state: randomToken(16)
+        });
+        link.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+      }).catch(function(){ /* leave href as "#" if crypto fails */ });
+    }
   })();
 
   // ---------------- Réglages ----------------

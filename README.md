@@ -1,0 +1,76 @@
+# Simple Player
+
+Lecteur Spotify minimaliste pour Windows — gros boutons, mode tactile, swipe pour changer de piste, mode sombre uniquement. Conçu pour remplacer l'app Spotify officielle par quelque chose de plus pratique au quotidien.
+
+## Structure du projet
+
+```
+simple-player/
+├── src/
+│   ├── main.js          → Processus principal Electron (fenêtre, tray, raccourcis, mises à jour)
+│   ├── preload.js        → Pont sécurisé entre main.js et l'interface
+│   ├── config.js          → Identifiants/paramètres de connexion Spotify (Client ID, redirect URI)
+│   └── renderer/
+│       └── index.html      → Toute l'interface (HTML + CSS + JS) : lecteur, bibliothèque, recherche, réglages
+├── build/
+│   ├── icon.ico            → Icône Windows (multi-résolutions), utilisée par l'installeur et la fenêtre
+│   ├── icon_tray.png         → Icône pour la zone de notification (même design, plus petit)
+│   ├── icon.png, icon_source_1024.png → Sources haute résolution de l'icône
+│   └── make_icon_f3_variant_b.py      → Script Python qui génère l'icône (modifiable si on veut l'ajuster plus tard)
+├── mockup.html              → Le prototype interactif original (gardé comme référence, n'est plus utilisé par l'app)
+├── package.json             → Dépendances, infos de l'app, config de l'installeur Windows
+├── push.bat                 → Raccourci optionnel pour envoyer les changements sur GitHub en une étape (nécessite Git en ligne de commande)
+└── README.md                → Ce fichier
+```
+
+## Ce que fait chaque fichier, en détail
+
+### `src/main.js`
+Le "cerveau" de l'application — tout ce qui touche à Windows plutôt qu'à l'affichage :
+- Crée la fenêtre principale et se souvient de sa taille/position/état maximisé d'une session à l'autre.
+- Crée l'icône dans la zone de notification (tray) : clic pour afficher/masquer la fenêtre, clic droit pour un menu avec "Quitter".
+- Ferme en minimisant vers le tray plutôt que de quitter (sauf via "Quitter" dans le menu du tray).
+- Écoute les touches **Espace** (lecture/pause), **←** (piste précédente), **→** (piste suivante) — uniquement quand la fenêtre a le focus, jamais comme raccourcis globaux Windows.
+- Gère le réglage "démarrage avec Windows" (`app.setLoginItemSettings`).
+- Vérifie s'il existe une nouvelle version à chaque lancement de l'application (via `electron-updater`).
+
+### `src/preload.js`
+Un petit fichier de sécurité qui expose uniquement les fonctions nécessaires (raccourcis clavier, réglage de démarrage) à l'interface, sans lui donner un accès direct et dangereux au système.
+
+### `src/config.js`
+Les paramètres de connexion à Spotify : l'identifiant de l'application (Client ID) et l'adresse locale utilisée pendant la connexion (`http://127.0.0.1:8888/callback`).
+
+### `src/spotifyAuth.js`
+La vraie connexion à Spotify : ouvre la page de connexion officielle dans ton navigateur, reçoit la réponse via un petit serveur local temporaire, échange le code contre les jetons d'accès, et conserve le jeton de rafraîchissement **chiffré** sur ton disque (via le coffre-fort intégré de Windows) pour que tu n'aies pas à te reconnecter à chaque lancement.
+
+### `src/renderer/index.html`
+Toute l'interface que tu vois et utilises : la pochette d'album, les boutons de lecture, le swipe tactile, la barre de volume, la bibliothèque, la recherche, et les réglages. C'est ce fichier qui gère l'affichage et qui, une fois la connexion Spotify branchée, parlera à ton compte Spotify.
+
+### `package.json`
+La carte d'identité de l'application pour Electron : son nom, sa version, comment la lancer en développement (`npm start`), comment construire l'installeur Windows (`npm run dist`), et où publier les mises à jour (ton repo GitHub).
+
+### `build/`
+Tout ce qui concerne l'icône de l'application : l'icône finale (`icon.ico`, `icon_tray.png`) et les scripts qui l'ont générée, gardés au cas où on voudrait l'ajuster plus tard.
+
+## Lancer le projet en développement
+
+```
+npm install
+npm start
+```
+
+## Construire l'installeur Windows
+
+```
+npm run dist
+```
+
+Ça produit un fichier `Simple Player-Setup-X.X.X.exe` dans un dossier `dist/`, prêt à installer.
+
+## État actuel du projet
+
+- ✅ Interface complète et validée (lecteur, bibliothèque, recherche, réglages, swipe, icône)
+- ✅ Fenêtre Windows, tray, position mémorisée, raccourcis clavier, démarrage avec Windows, vérification de mise à jour
+- ✅ Connexion réelle à Spotify (OAuth) — bouton "Connect to Spotify" fonctionnel dans les réglages
+- ⏳ Lecture réelle de musique via Spotify (Web Playback SDK) — à venir
+- ⏳ Bibliothèque et recherche branchées sur ton vrai compte Spotify — à venir

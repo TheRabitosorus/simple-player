@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electr
 const path = require('path');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
+const spotifyAuth = require('./spotifyAuth');
 
 const store = new Store({
   defaults: {
@@ -137,6 +138,21 @@ ipcMain.handle('settings:get-launch-at-startup', () => store.get('launchAtStartu
 ipcMain.handle('settings:set-launch-at-startup', (event, enabled) => {
   setLaunchAtStartup(enabled);
   return store.get('launchAtStartup');
+});
+
+// --- Spotify connection, driven from the Settings page ---
+ipcMain.handle('spotify:get-status', () => spotifyAuth.isConnected());
+ipcMain.handle('spotify:connect', async () => {
+  try {
+    await spotifyAuth.startLogin();
+    return { connected: true };
+  } catch (err) {
+    return { connected: false, error: err.message };
+  }
+});
+ipcMain.handle('spotify:disconnect', () => {
+  spotifyAuth.disconnect();
+  return { connected: false };
 });
 
 app.whenReady().then(() => {
