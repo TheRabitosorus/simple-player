@@ -9,12 +9,12 @@ const store = new Store({
     windowBounds: { width: 480, height: 760, x: undefined, y: undefined },
     windowMaximized: false,
     launchAtStartup: false,
-    zoomFactor: 1.0
+    zoomFactor: 1.6
   }
 });
 
 const ZOOM_MIN = 0.7;
-const ZOOM_MAX = 2.0;
+const ZOOM_MAX = 2.2;
 const ZOOM_STEP = 0.1;
 
 function clampZoom(z) {
