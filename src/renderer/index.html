@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<meta charset="utf-8">
+<!-- Content Security Policy: this page only ever talks to Spotify's API and
+     loads fonts/cover art over https; no remote scripts. Inline script/style
+     are needed because the whole UI lives in this one file. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; connect-src https://api.spotify.com; base-uri 'none'; form-action 'none'">
 <title>Simple Player</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -40,19 +45,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app{height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* ---------- Title bar ---------- */
+/* No bar/background — just the fullscreen button, floating top-right.
+   The brand name/dot/preview-note are kept in the markup (harmless) but
+   hidden; the window's title already carries the app name + version
+   (see main.js), so nothing is lost by dropping them from here. */
 #titlebar{
   flex:0 0 auto;
   padding-top:max(10px, env(safe-area-inset-top,0px));
   padding-bottom:10px;
-  background:var(--bg-elev);
-  border-bottom:1px solid var(--border);
+  background:transparent;
+  border-bottom:none;
   max-height:80px;
   overflow:hidden;
 }
-#titlebar .px{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.tb-left{display:flex;align-items:center;gap:12px;min-width:0;}
-.tb-brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px;letter-spacing:.2px;flex:0 0 auto;}
-.tb-brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);flex:0 0 auto;}
+#titlebar .px{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
+.tb-left,.tb-brand,.tb-note{display:none;}
 .tb-right{display:flex;align-items:center;gap:14px;}
 .playlist-badge{
   position:absolute;z-index:2;
@@ -81,7 +88,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   gap:clamp(14px,3vh,28px);
   padding:20px calc(var(--rail-w) + 12px) 16px 20px;
   transition:padding .25s ease;
-  touch-action:pan-y;
+  /* We handle both the horizontal (track swipe) and vertical (volume)
+     drag entirely in JS — touch-action:pan-y was telling the browser to
+     take over the vertical gesture itself for native scrolling/panning,
+     which fought with our own pointermove handling on real touch input
+     (works fine with a mouse, since this CSS property only affects
+     touch/pen) and could cancel the gesture before the volume rail had
+     a chance to show. none leaves both axes to our own code. */
+  touch-action:none;
 }
 
 /* ---------- Mode immersif (3s sans interaction) ---------- */
@@ -92,22 +106,34 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #progressWrap,#transport{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;overflow:hidden;}
 #addToLibraryWrap{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;}
 #app.idle #addToLibraryWrap{overflow:hidden;}
-#volumeRail{transition:opacity .35s ease;}
+#volumeRail{transition:opacity .35s ease, transform .35s ease;}
+/* Left is set from JS (tracks the cover art's right edge); inert outside
+   idle mode so it never competes with the always-visible rail's own
+   controls or anything else. */
+#idleVolumeZone{position:absolute;top:0;bottom:0;right:0;left:100%;pointer-events:none;touch-action:none;}
+#app.idle #idleVolumeZone{pointer-events:auto;}
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
 #app.idle #titlebar{background:transparent;border-color:transparent;max-height:0;padding-top:0;padding-bottom:0;}
 #app.idle .tb-brand,#app.idle .tb-note,#app.idle .tb-icon-btn{opacity:0;pointer-events:none;}
 #app.idle #transport,#app.idle #addToLibraryWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
-#app.idle #volumeRail{opacity:0;pointer-events:none;}
+/* Hidden off to the right (not just faded out) while idle, but NOT inert:
+   pointer-events stays enabled so a single tap here — the space between
+   the cover art and the window's edge — is caught (see JS) even though
+   nothing is visually drawn yet. */
+#app.idle #volumeRail{opacity:0;transform:translateX(100%);pointer-events:auto;}
 /* The right padding on #swipeZone normally reserves room for the volume
    rail; in idle mode the rail is invisible, so without this the whole
    centered column (art included) stays shifted left by that reserved
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;}
-/* While the user is actively dragging up/down on the cover art to change
-   the volume in idle mode, the rail becomes visible again as feedback
-   (level + direction), then fades back out once the gesture ends. */
-#app.idle.volume-dragging #volumeRail{opacity:1;pointer-events:none;transition:opacity .12s ease;}
+/* One tap on that space reveals the rail, sliding in from the right, and
+   it stays up (draggable, exactly like the normal always-visible rail)
+   until a few seconds pass with no interaction. The swipe zone's right
+   padding comes back too while this is open, so the (much larger,
+   idle-sized) cover art doesn't crowd it out visually. */
+#app.idle.volume-revealed #volumeRail{opacity:1;transform:translateX(0);pointer-events:auto;transition:opacity .28s ease, transform .32s cubic-bezier(.2,.7,.3,1);}
+#app.idle.volume-revealed #swipeZone{padding-right:calc(var(--rail-w) + 12px);transition:padding-right .28s ease;}
 #art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
@@ -229,6 +255,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #settingsExitBtn:hover{filter:brightness(1.08);}
 #settingsExitBtn:active{transform:scale(.97);}
 .settings-note{font-size:11px;color:var(--fg-faint);margin:12px 0 0;font-style:italic;max-width:420px;line-height:1.5;}
+.link-btn{background:none;border:none;color:var(--accent);font-size:12px;padding:8px 0 0;cursor:pointer;text-decoration:underline;}
+.link-btn:hover{opacity:.8;}
 .pill-group{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .pill{padding:10px 17px;border-radius:20px;background:var(--bg-elev);border:1px solid var(--border);font-size:13px;font-weight:700;color:var(--fg-dim);}
 .pill:hover{background:var(--bg-elev-2);color:var(--fg);}
@@ -421,6 +449,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         <div id="volTrack"><div id="volFill"></div><div id="volThumb"></div></div>
         <span id="volLabel">70%</span>
       </aside>
+
+      <!-- Idle-mode only: an invisible touch zone spanning from the cover
+           art's right edge all the way to the window's edge (its left
+           position is set from JS to track the art's actual size, since
+           that varies). A single tap anywhere in it reveals the volume
+           rail; once revealed, dragging in it adjusts the volume. Inert
+           (pointer-events:none) outside idle mode, where the always-
+           visible rail's own controls handle things as usual. -->
+      <div id="idleVolumeZone"></div>
     </section>
 
     <!-- Bibliothèque -->
@@ -522,6 +559,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           </div>
           <p class="settings-note">This setting, along with remembering the window's position and size, only works in the real Windows app — not in this preview.</p>
         </div>
+
+        <div class="lib-section">
+          <h3>Window position</h3>
+          <p class="settings-desc">Position and size are saved automatically whenever you move or resize the window. Use these if that ever doesn't seem to be happening.</p>
+          <div class="pill-group" id="windowPosButtons">
+            <button class="pill" id="savePositionBtn">Save current position</button>
+            <button class="pill" id="restorePositionBtn">Restore last saved</button>
+          </div>
+          <p class="settings-note" id="windowPosNote">Only works in the real Windows app — not in this preview.</p>
+        </div>
+
+        <div class="lib-section">
+          <h3>Ghost Spotify</h3>
+          <p class="settings-desc">When nothing is playing anywhere, automatically start a hidden Spotify on this computer so Play always has somewhere to go. Closes together with Simple Player.</p>
+          <div class="pill-group" id="ghostGroup">
+            <button class="pill" data-value="off">Off</button>
+            <button class="pill" data-value="on">On</button>
+          </div>
+          <p class="settings-note" id="ghostNote">Requires the standard Spotify desktop installer (not the Microsoft Store version), on the computer running Simple Player.</p>
+          <button id="ghostPickExeBtn" class="link-btn" hidden>Locate Spotify.exe…</button>
+        </div>
       </div>
 
       <div id="settingsExitWrap" class="px">
@@ -557,6 +615,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 <script>
 (function(){
   "use strict";
+
+  // Settings for "Ghost Spotify" (see Settings tab + friendlySpotifyError
+  // below). Declared early since the Settings-tab wiring reads it before
+  // the real-playback code further down the file would otherwise set it.
+  var ghostSettings = { enabled: false, exePath: null, platformSupported: false };
 
   // ---------------- Data (fictif, pour la démo) ----------------
   var CATALOG = [
@@ -594,6 +657,22 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function trackById(id){ for (var i=0;i<CATALOG.length;i++) if (CATALOG[i].id===id) return CATALOG[i]; return null; }
   function fmt(s){ s=Math.max(0,Math.floor(s)); var m=Math.floor(s/60), sec=String(s%60).padStart(2,'0'); return m+":"+sec; }
+
+  // ---------------- Safety helpers ----------------
+  // Escape text before putting it into an innerHTML string.
+  function escHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  // Build a safe CSS url('...') value (usable inside a style="..." attribute
+  // or assigned to element.style). Only https images and our own generated
+  // data: images are allowed; anything else becomes 'none'.
+  function cssUrl(u){
+    var s = String(u || '');
+    if (!/^(https:\/\/|data:image\/)/i.test(s)) return 'none';
+    return "url('" + s.replace(/['"\\()\s]/g, function(c){ return encodeURIComponent(c); }) + "')";
+  }
 
   // ---------------- Generated cover art ----------------
   var artCache = {};
@@ -720,7 +799,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   // ---------------- Réglages ----------------
   var settings = {
-    idleDelay: 3000,
+    idleDelay: 5000,
     volZone: 'normal',
     bgEnabled: true,
     startup: false
@@ -771,7 +850,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function renderTrack(keepPlaying){
     var t = currentTrack();
     if (!t) return;
-    $art.style.backgroundImage = "url("+makeArt(t.id+':'+t.title)+")";
+    $art.style.backgroundImage = cssUrl(makeArt(t.id+':'+t.title));
     $title.textContent = t.title;
     $artist.textContent = t.artist;
     $total.textContent = fmt(t.duration);
@@ -850,6 +929,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var size = Math.max(40, Math.min(cap, rect.width, rect.height));
     $art.style.width = size + 'px';
     $art.style.height = size + 'px';
+    // The idle-mode volume reveal zone spans from the art's actual right
+    // edge to the window's edge — recompute it here too, since this is
+    // the one place art's size is known to have just changed (idle
+    // entry/exit, resize, zoom, tab switches all already call this).
+    var idleZone = document.getElementById('idleVolumeZone');
+    if (idleZone) {
+      var artRect = $art.getBoundingClientRect();
+      idleZone.style.left = (artRect.right + 8) + 'px';
+    }
   }
   window.addEventListener('resize', fitArtSquare);
 
@@ -860,7 +948,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // to 2 seconds. The next poll still confirms/corrects it either way.
       state.playing = true;
       setPlayIcon(true);
-      spotifyApi('/me/player/play', { method: 'PUT' }).catch(function(){});
+      spotifyApi('/me/player/play', { method: 'PUT' }).catch(function(err){
+        state.playing = false;
+        setPlayIcon(false);
+        showToast(friendlySpotifyError(err));
+      });
       return;
     }
     if (state.playing) return;
@@ -891,7 +983,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (useRealPlayback){
       state.playing = false;
       setPlayIcon(false);
-      spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){});
+      spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(err){
+        showToast(friendlySpotifyError(err));
+      });
       return;
     }
     state.playing = false;
@@ -919,7 +1013,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function next(auto, skipShake){
-    if (useRealPlayback){ spotifyApi('/me/player/next', { method: 'POST' }).then(pollPlaybackState).catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/next', { method: 'POST' }).then(pollPlaybackState).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
     state.index = pickNextIndex();
     renderTrack();
     if (!auto && !skipShake){
@@ -930,7 +1024,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     renderLibraryPlayingState();
   }
   function prev(skipShake){
-    if (useRealPlayback){ spotifyApi('/me/player/previous', { method: 'POST' }).then(pollPlaybackState).catch(function(){}); return; }
+    if (useRealPlayback){ spotifyApi('/me/player/previous', { method: 'POST' }).then(pollPlaybackState).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
     state.index = pickPrevIndex();
     renderTrack();
     if (!skipShake){
@@ -952,7 +1046,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       lastShuffleChangeAt = Date.now();
       spotifyApi('/me/player/shuffle?state=' + next, { method: 'PUT' }).catch(function(err){
         $shuffleBtn.classList.toggle('on', !next);
-        showToast(/\b403\b/.test(err.message) ? 'Spotify refused that (try again?)' : 'Could not reach Spotify');
+        showToast(friendlySpotifyError(err));
       });
       return;
     }
@@ -967,7 +1061,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       lastRepeatChangeAt = Date.now();
       spotifyApi('/me/player/repeat?state=' + newState, { method: 'PUT' }).catch(function(err){
         $repeatBtn.classList.toggle('on', isOn);
-        showToast(/\b403\b/.test(err.message) ? 'Spotify refused that (try again?)' : 'Could not reach Spotify');
+        showToast(friendlySpotifyError(err));
       });
       return;
     }
@@ -1035,11 +1129,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   })();
 
   // ---------------- Swipe (changer de titre, pochette suit le doigt) ----------------
+  // Handles ONLY horizontal drag (swipe to change track) and tap/double-tap.
+  // Volume is a separate, dedicated gesture on the right-edge zone below —
+  // this used to also handle a vertical "drag anywhere to adjust volume"
+  // gesture, but detecting that reliably alongside horizontal swipe proved
+  // too fragile on real touch input, so it's been split out entirely.
   (function(){
     var zone = document.getElementById('swipeZone');
     var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
-    var startVolume = 0;
     var lastTapTime = 0;
 
     function noTransition(){ $art.style.transition = 'none'; }
@@ -1052,7 +1150,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       genId++;
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
-      startVolume = state.volume;
       try { zone.setPointerCapture(pid); } catch(err){}
       noTransition();
     }
@@ -1061,18 +1158,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var dx = e.clientX - startX, dy = e.clientY - startY;
       if (locked === null){
         if (Math.abs(dx) > 6 || Math.abs(dy) > 6){
+          // A predominantly vertical movement here is simply not a swipe —
+          // it's ignored (no volume handling anymore; see the dedicated
+          // volume zone), so play/pause-by-tap and horizontal swipe never
+          // get confused with it.
           locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-          if (locked === 'y') document.getElementById('app').classList.add('volume-dragging');
         }
-      }
-      if (locked === 'y'){
-        // Drag up raises the volume, drag down lowers it — 220px of travel
-        // covers the full 0–100% range.
-        var deltaVol = -(dy / 220) * 100;
-        state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
-        if (updateVolumeDisplay) updateVolumeDisplay();
-        if (onVolumeChange) onVolumeChange(state.volume);
-        return;
       }
       if (locked !== 'x') return;
       noTransition();
@@ -1112,11 +1203,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function onUp(e){
       if (!dragging) return;
       dragging = false;
-      if (locked === 'y'){
-        // Leave the volume feedback on screen for a beat so the final
-        // level is actually visible, then fade it back out.
-        setTimeout(function(){ document.getElementById('app').classList.remove('volume-dragging'); }, 700);
-      }
       if (locked === 'x'){
         var dx = e.clientX - startX;
         if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
@@ -1140,7 +1226,72 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     zone.addEventListener('pointerdown', onDown);
     zone.addEventListener('pointermove', onMove);
     zone.addEventListener('pointerup', onUp);
-    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; snapBack(); document.getElementById('app').classList.remove('volume-dragging'); } });
+    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; snapBack(); } });
+  })();
+
+  // ---------------- Volume reveal zone (idle mode) ----------------
+  // Covers the whole space between the cover art and the window's right
+  // edge (its bounds are kept in sync by fitArtSquare, above). While
+  // idle: a single tap here reveals the volume rail (sliding in from the
+  // right); once revealed, dragging up/down in this same zone adjusts
+  // the volume, like the always-visible rail does outside idle mode.
+  // Splitting "reveal" and "adjust" into two separate steps, instead of
+  // trying to detect both within one continuous gesture, is deliberate —
+  // the combined version proved unreliable on real touch input.
+  (function(){
+    var zone = document.getElementById('idleVolumeZone');
+    var app = document.getElementById('app');
+    var dragging = false, startY = 0, startVolume = 0, pid = null, hideTimer = null;
+
+    function isIdle(){ return app.classList.contains('idle'); }
+    function isRevealed(){ return app.classList.contains('volume-revealed'); }
+
+    function scheduleHide(){
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(function(){
+        app.classList.remove('volume-revealed');
+        fitArtSquare();
+        hideTimer = null;
+      }, 2500);
+    }
+
+    zone.addEventListener('pointerdown', function(e){
+      if (!isIdle()) return;
+      if (!isRevealed()){
+        // First tap while hidden: just reveal it. Deliberately NOT also
+        // starting a drag from this same touch, so an imprecise first
+        // tap can't also yank the volume before the rail is even visible.
+        app.classList.add('volume-revealed');
+        fitArtSquare();
+        scheduleHide();
+        e.preventDefault();
+        return;
+      }
+      // Already revealed: this touch adjusts the volume directly.
+      dragging = true; pid = e.pointerId;
+      startY = e.clientY; startVolume = state.volume;
+      try { zone.setPointerCapture(pid); } catch(err){}
+      scheduleHide();
+      e.preventDefault();
+    }, { passive: false });
+
+    zone.addEventListener('pointermove', function(e){
+      if (!dragging) return;
+      var dy = e.clientY - startY;
+      var deltaVol = -(dy / 220) * 100; // same 220px-for-full-range mapping as elsewhere
+      state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
+      if (updateVolumeDisplay) updateVolumeDisplay();
+      if (onVolumeChange) onVolumeChange(state.volume);
+      scheduleHide();
+    });
+
+    function endDrag(){
+      if (!dragging) return;
+      dragging = false;
+      scheduleHide();
+    }
+    zone.addEventListener('pointerup', endDrag);
+    zone.addEventListener('pointercancel', endDrag);
   })();
 
   // ---------------- Volume rail ----------------
@@ -1272,7 +1423,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           var item = document.createElement('button');
           item.className = 'add-menu-item';
           var imgUrl = (pl.images && pl.images[0]) ? pl.images[0].url : '';
-          item.innerHTML = '<div class="swatch" style="background-image:url(' + imgUrl + ');background-color:var(--bg-elev-2);"></div><span></span>';
+          item.innerHTML = '<div class="swatch" style="background-image:' + cssUrl(imgUrl) + ';background-color:var(--bg-elev-2);"></div><span></span>';
           item.querySelector('span').textContent = pl.name;
           item.addEventListener('click', function(){ addTrackToRealPlaylist(pl); });
           menu.appendChild(item);
@@ -1288,7 +1439,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         PLAYLISTS.forEach(function(pl){
           var item = document.createElement('button');
           item.className = 'add-menu-item';
-          item.innerHTML = '<div class="swatch" style="background-image:url(' + makeArt('pl:'+pl.id) + ')"></div><span></span>';
+          item.innerHTML = '<div class="swatch" style="background-image:' + cssUrl(makeArt('pl:'+pl.id)) + '"></div><span></span>';
           item.querySelector('span').textContent = pl.name;
           item.addEventListener('click', function(){ closeMenu(); showToast('Added to "' + pl.name + '"'); });
           menu.appendChild(item);
@@ -1387,6 +1538,87 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     settings.startup = (v === 'on');
     if (window.simplePlayer) window.simplePlayer.setLaunchAtStartup(settings.startup);
   });
+
+  // ---------------- Window position (manual save/restore) ----------------
+  (function(){
+    var saveBtn = document.getElementById('savePositionBtn');
+    var restoreBtn = document.getElementById('restorePositionBtn');
+    var note = document.getElementById('windowPosNote');
+    if (!saveBtn || !restoreBtn) return;
+    var available = !!(window.simplePlayer && window.simplePlayer.saveWindowPositionNow);
+    if (!available) { saveBtn.disabled = true; restoreBtn.disabled = true; return; }
+    note.textContent = '';
+    saveBtn.addEventListener('click', function(){
+      window.simplePlayer.saveWindowPositionNow().then(function(){
+        showToast('Position saved');
+      });
+    });
+    restoreBtn.addEventListener('click', function(){
+      window.simplePlayer.restoreSavedWindowPosition().then(function(){
+        showToast('Position restored');
+      });
+    });
+  })();
+
+  // ---------------- Ghost Spotify ----------------
+  (function(){
+    var pickBtn = document.getElementById('ghostPickExeBtn');
+    var note = document.getElementById('ghostNote');
+    var defaultNote = note ? note.textContent : '';
+
+    function refreshNote(){
+      if (!note) return;
+      if (!ghostSettings.platformSupported) {
+        note.textContent = 'Only available in the real Windows app — not in this preview.';
+        if (pickBtn) pickBtn.hidden = true;
+      } else if (!ghostSettings.exePath) {
+        note.textContent = "Couldn't find Spotify.exe automatically — locate it to finish turning this on.";
+        if (pickBtn) pickBtn.hidden = !ghostSettings.enabled;
+      } else {
+        note.textContent = defaultNote;
+        if (pickBtn) pickBtn.hidden = true;
+      }
+    }
+
+    wirePillGroup('ghostGroup', 'off', function(v){
+      var enabled = (v === 'on');
+      if (window.simplePlayer && window.simplePlayer.ghostSetEnabled) {
+        window.simplePlayer.ghostSetEnabled(enabled).then(function(){
+          ghostSettings.enabled = enabled;
+          refreshNote();
+          if (enabled) ensureActiveDeviceOrGhost();
+        });
+      } else {
+        ghostSettings.enabled = enabled; // preview only
+        refreshNote();
+      }
+    });
+
+    if (pickBtn) {
+      pickBtn.addEventListener('click', function(){
+        if (!window.simplePlayer || !window.simplePlayer.ghostPickExe) return;
+        window.simplePlayer.ghostPickExe().then(function(exePath){
+          ghostSettings.exePath = exePath;
+          refreshNote();
+        });
+      });
+    }
+
+    if (window.simplePlayer && window.simplePlayer.ghostGetSettings) {
+      window.simplePlayer.ghostGetSettings().then(function(s){
+        ghostSettings = s;
+        var group = document.getElementById('ghostGroup');
+        if (group) {
+          group.querySelectorAll('.pill').forEach(function(p){
+            p.classList.toggle('active', p.dataset.value === (s.enabled ? 'on' : 'off'));
+          });
+        }
+        refreshNote();
+      });
+    } else {
+      refreshNote();
+    }
+  })();
 
   // ---------------- Interface size (zoom) ----------------
   // Mirrors Ctrl+scroll / Ctrl +/-/0 in main.js: both drive the same
@@ -1490,7 +1722,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     row.className = 'track-row';
     row.dataset.trackId = t.id;
     row.innerHTML =
-      '<div class="thumb" style="background-image:url(' + t.artUrl + ');background-color:var(--bg-elev-2);"></div>' +
+      '<div class="thumb" style="background-image:' + cssUrl(t.artUrl) + ';background-color:var(--bg-elev-2);"></div>' +
       '<div class="meta"><div class="ttl"></div><div class="sub"></div></div>' +
       '<div class="dur">' + fmt(t.duration) + '</div>';
     row.querySelector('.ttl').textContent = t.title;
@@ -1543,7 +1775,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           var card = document.createElement('div');
           card.className = 'pl-card';
           card.innerHTML =
-            '<div class="cover" style="background-image:url(' + img + ');background-color:var(--bg-elev-2);"></div>' +
+            '<div class="cover" style="background-image:' + cssUrl(img) + ';background-color:var(--bg-elev-2);"></div>' +
             '<div class="name"></div><div class="count"></div>';
           card.querySelector('.name').textContent = pl.name;
           card.querySelector('.count').textContent = (pl.tracks ? pl.tracks.total : 0) + ' tracks';
@@ -1577,7 +1809,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var card = document.createElement('div');
       card.className = 'pl-card';
       card.innerHTML =
-        '<div class="cover" style="background-image:url(' + makeArt('pl:'+pl.id) + ')"></div>' +
+        '<div class="cover" style="background-image:' + cssUrl(makeArt('pl:'+pl.id)) + '"></div>' +
         '<div class="name"></div><div class="count"></div>';
       card.querySelector('.name').textContent = pl.name;
       card.querySelector('.count').textContent = tracks.length + ' tracks';
@@ -1612,7 +1844,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       searchRealTracks(q).then(function(tracks){
         if (searchInput.value.trim() !== q) return; // a newer query already superseded this one
         searchResults.innerHTML = '';
-        if (!tracks.length){ searchResults.innerHTML = '<div class="search-empty">No results for “' + q + '”.</div>'; return; }
+        if (!tracks.length){ searchResults.innerHTML = '<div class="search-empty">No results for “' + escHtml(q) + '”.</div>'; return; }
         var uris = tracks.map(function(t){ return t.uri; });
         tracks.forEach(function(t, i){
           searchResults.appendChild(trackRow(t, function(){ playRealUris(uris, i); }));
@@ -1633,7 +1865,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       return normalize(t.title).indexOf(nq) !== -1 || normalize(t.artist).indexOf(nq) !== -1;
     });
     if (!matches.length){
-      searchResults.innerHTML = '<div class="search-empty">No results for “' + q + '”.</div>';
+      searchResults.innerHTML = '<div class="search-empty">No results for “' + escHtml(q) + '”.</div>';
       return;
     }
     matches.forEach(function(t, i){
@@ -1689,14 +1921,72 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   async function spotifyApi(path, options){
     options = options || {};
-    var token = await window.simplePlayer.spotifyGetAccessToken();
+    var token;
+    try {
+      token = await window.simplePlayer.spotifyGetAccessToken();
+    } catch (tokenErr) {
+      // main.js/spotifyAuth.js marks this with REAUTH_REQUIRED when the
+      // stored token is no longer valid and has just been cleared — tag
+      // it here so friendlySpotifyError() can tell the user precisely
+      // what's wrong instead of the generic "Could not reach Spotify".
+      var authErr = new Error((tokenErr && tokenErr.message) || 'Spotify auth error');
+      authErr.reauthRequired = /REAUTH_REQUIRED/.test(authErr.message);
+      refreshSpotifyConnectedBadge();
+      throw authErr;
+    }
     var res = await fetch('https://api.spotify.com/v1' + path, Object.assign({}, options, {
       headers: Object.assign({ 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, options.headers || {})
     }));
     if (res.status === 204) return null;
-    if (!res.ok) throw new Error('Spotify API error ' + res.status + ' on ' + path);
+    if (!res.ok) {
+      var reason = '';
+      try { var body = await res.json(); reason = (body && body.error && body.error.reason) || ''; } catch(e){}
+      var err = new Error('Spotify API error ' + res.status + ' on ' + path + (reason ? ' (' + reason + ')' : ''));
+      err.status = res.status;
+      err.reason = reason;
+      throw err;
+    }
     var text = await res.text();
     return text ? JSON.parse(text) : null;
+  }
+
+  // Re-reads the connected/not-connected status from main.js and updates
+  // the Settings badge. Used after a token refresh fails and the stored
+  // auth gets cleared, so the UI stops claiming "Connected" once it no
+  // longer actually is.
+  function refreshSpotifyConnectedBadge(){
+    if (!window.simplePlayer || !window.simplePlayer.spotifyGetStatus) return;
+    window.simplePlayer.spotifyGetStatus().then(function(connected){
+      var statusEl = document.getElementById('accountStatus');
+      var link = document.getElementById('connectSpotifyBtn');
+      if (!statusEl || !link) return;
+      statusEl.classList.toggle('connected', connected);
+      statusEl.innerHTML = '<span class="status-dot"></span>' + (connected ? 'Connected' : 'Not connected');
+      link.textContent = connected ? 'Disconnect' : 'Connect to Spotify';
+    });
+  }
+
+  // Turns a spotifyApi() error into a message the user can actually act
+  // on. "No active device" is by far the most common real-world cause of
+  // "nothing happens" — Simple Player is a remote control, so something
+  // (phone, computer, speaker) has to already be an active Spotify
+  // Connect device for any transport command to have anything to reach.
+  // If "Ghost Spotify" is enabled, this also asks main.js to launch a
+  // hidden Spotify on this computer instead of just telling the user to
+  // do it themselves. (ghostSettings is declared near the top of this file.)
+  function friendlySpotifyError(err){
+    if (err && err.reauthRequired) {
+      return 'Your Spotify connection expired — go to Settings and reconnect.';
+    }
+    if (err && (err.reason === 'NO_ACTIVE_DEVICE' || err.status === 404)) {
+      if (ghostSettings.enabled && window.simplePlayer.ghostNoActiveDevice) {
+        window.simplePlayer.ghostNoActiveDevice();
+        return 'No active device — starting Spotify for you, try again in a few seconds.';
+      }
+      return 'No Spotify device is active. Open Spotify on your phone, computer, or a speaker and press play there first.';
+    }
+    if (err && err.status === 403) return 'Spotify refused that (try again?)';
+    return 'Could not reach Spotify';
   }
 
   function renderRealProgress(){
@@ -1786,12 +2076,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function playRealUris(uris, startIndex){
     var body = { uris: uris };
     if (startIndex) body.offset = { position: startIndex };
-    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(){});
+    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(err){ showToast(friendlySpotifyError(err)); });
   }
   function playRealContext(contextUri, trackUri){
     var body = { context_uri: contextUri };
     if (trackUri) body.offset = { uri: trackUri };
-    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(){});
+    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(err){ showToast(friendlySpotifyError(err)); });
   }
 
   function invalidateLibraryCache(){
@@ -1810,7 +2100,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function updateNpBackgroundReal(artUrl){
     if (!settings.bgEnabled || !artUrl){ $npBackground.style.background = 'var(--bg)'; $npBackground.style.backgroundImage = 'none'; return; }
-    $npBackground.style.backgroundImage = "url('" + artUrl + "')";
+    $npBackground.style.backgroundImage = cssUrl(artUrl);
     $npBackground.style.backgroundSize = 'cover';
     $npBackground.style.backgroundPosition = 'center';
     $npBackground.style.filter = 'blur(60px) brightness(.45)';
@@ -1835,7 +2125,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (isNewTrack) {
       var artists = (t.artists || []).map(function(a){ return a.name; }).join(', ');
       var artUrl = t.album && t.album.images && t.album.images[0] ? t.album.images[0].url : '';
-      if (artUrl) $art.style.backgroundImage = "url('" + artUrl + "')";
+      if (artUrl) $art.style.backgroundImage = cssUrl(artUrl);
       $title.textContent = t.name;
       $artist.textContent = artists;
       $total.textContent = fmt(t.duration_ms / 1000);
@@ -1858,9 +2148,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     startRealProgressTimer();
   }
 
+  // One request at a time (a slow response never stacks up behind new
+  // ones), and nothing while the window is hidden in the tray — saves
+  // Spotify API calls and battery. Polling resumes the moment it's shown.
+  var pollInFlight = false;
   function pollPlaybackState(){
-    return spotifyApi('/me/player').then(renderRealTrack).catch(function(){ /* transient network hiccup: next poll retries */ });
+    if (pollInFlight || document.hidden) return Promise.resolve();
+    pollInFlight = true;
+    return spotifyApi('/me/player').then(renderRealTrack)
+      .catch(function(){ /* transient network hiccup: next poll retries */ })
+      .then(function(){ pollInFlight = false; });
   }
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && useRealPlayback) pollPlaybackState();
+  });
 
   function startPolling(){
     useRealPlayback = true;
@@ -1868,6 +2169,22 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (pollTimer) clearInterval(pollTimer);
     pollTimer = setInterval(pollPlaybackState, 2000);
     renderLibrary(); // switch Library over from demo data to the real account
+    ensureActiveDeviceOrGhost();
+  }
+
+  // Proactively checks, right when we connect, whether ANY Spotify Connect
+  // device is already active anywhere on the account. If none is, and
+  // Ghost Spotify is enabled, asks main.js to launch one — rather than
+  // waiting for the user to hit Play and get an error first.
+  function ensureActiveDeviceOrGhost(){
+    if (!ghostSettings.enabled) return;
+    spotifyApi('/me/player/devices').then(function(res){
+      var devices = (res && res.devices) || [];
+      var hasActive = devices.some(function(d){ return d.is_active; });
+      if (!hasActive && window.simplePlayer.ghostNoActiveDevice) {
+        window.simplePlayer.ghostNoActiveDevice();
+      }
+    }).catch(function(){ /* ignore: worst case the user hits Play and gets the normal flow */ });
   }
 
   onVolumeChange = function(vol){

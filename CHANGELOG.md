@@ -2,6 +2,66 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.13.0 — 23 octobre 2026
+
+**IMPORTANT — erreur de ma part dans l'emballage des zips (v1.9.2 à v1.12.0).** Ces zips contenaient un dossier racine `simple-player/` au lieu d'avoir les fichiers directement à la racine. Résultat : `deploy.bat` extrayait tout dans `F:\GitHub Repo\simple-player\simple-player\`, et `run.bat` continuait de lancer l'ancienne v1.9.1 restée à la racine. **Aucune des versions 1.9.2 à 1.12.0 n'a réellement tourné chez toi** — ce qui explique que rien ne changeait (position de fenêtre, immersif 5 s, volume, erreurs Spotify). Ce zip-ci est de nouveau à plat.
+
+**À faire une fois :** supprime le dossier `F:\GitHub Repo\simple-player\simple-player` (copie en trop, probablement poussée sur GitHub aussi), puis lance deploy.bat et run.bat.
+
+Revue complète du code (sécurité, propreté, performance) :
+- **Sécurité** : fenêtre en mode `sandbox`, navigation et nouvelles fenêtres bloquées, Content-Security-Policy dans la page (seul api.spotify.com est joignable), texte de recherche échappé avant affichage, URLs d'images filtrées (https uniquement), entrées IPC validées, l'objet d'événement IPC n'est plus transmis à la page.
+- **Position de fenêtre** : sauvegarde différée de 300 ms pendant le déplacement (au lieu de dizaines d'écritures disque par seconde) ; si l'écran sauvegardé n'existe plus (moniteur débranché), la fenêtre se recentre au lieu d'apparaître hors écran.
+- **Performance** : le sondage Spotify (toutes les 2 s) ne fait plus qu'une requête à la fois et se met en pause quand la fenêtre est cachée dans le tray.
+- **Propreté** : encodage UTF-8 déclaré, commentaires périmés (Web Playback SDK) corrigés, code mort retiré.
+
+## v1.12.0 — 23 octobre 2026
+
+- **Volume en mode idle, refait selon ta description.** Une zone tactile invisible couvre maintenant **tout l'espace entre le bord droit de la pochette et le bord de la fenêtre** (sa largeur suit la taille réelle de la pochette). Un **tap** dans cette zone fait apparaître la barre de volume, qui glisse depuis la droite. Une fois visible, **glisse le doigt vers le haut/bas dans cette même zone** pour régler le son. La barre se recache toute seule après 2,5 secondes sans interaction.
+- **Bande noire du haut supprimée.** Plus de barre "Simple Player" en haut du player : il ne reste que le bouton plein écran, en haut à droite (toujours caché en mode idle, comme avant).
+- **Version affichée** dans le titre de la fenêtre Windows : "Simple Player v1.12.0".
+- Immersive mode : le délai par défaut est bien de 5 secondes (c'était déjà le cas depuis la v1.10.1 — si tu testais une version plus ancienne, c'est pour ça).
+
+## v1.11.1 — 23 octobre 2026
+
+- **Trouvé une cause probable et sérieuse pour la position de fenêtre qui ne se garde pas : rien n'empêchait d'avoir plusieurs copies de Simple Player ouvertes en même temps.** Fermer avec le X ne quitte pas vraiment l'app (elle se cache dans le tray, volontairement) — donc si tu relances l'app sans passer par "Quitter" dans le tray, une **deuxième** copie démarre, avec sa propre fenêtre, et les deux se marchent dessus en écrivant dans le même fichier de réglages. Une ancienne copie oubliée en arrière-plan peut très bien réécrire par-dessus la position que tu viens d'ajuster dans la nouvelle. C'est corrigé : une seconde tentative de lancement ramène maintenant simplement la fenêtre existante au premier plan, au lieu d'en ouvrir une nouvelle.
+- **Ajouté, comme tu l'as suggéré** : dans Settings → "Window position", deux boutons pour sauvegarder ou restaurer la position manuellement, en filet de sécurité si jamais la sauvegarde automatique semble ne pas fonctionner.
+- Si le problème persiste même après cette mise à jour (en étant sûr de n'avoir qu'une seule copie ouverte), dis-le-moi — on creusera plus loin.
+
+## v1.11.0 — 23 octobre 2026
+
+**Nouveau geste pour le volume en mode idle, suite à ta suggestion.** Le geste "glisser n'importe où sur la pochette pour ajuster le son" s'est révélé trop peu fiable sur tactile (deux corrections n'ont pas suffi), donc je l'ai remplacé par une approche plus simple, comme tu l'as proposé :
+
+- La pochette ne gère plus que : **tap** = play/pause, **glisser horizontalement** = changer de piste.
+- **Toucher le bord droit de l'écran** (là où se trouve la barre de volume, même quand elle est invisible en idle) la fait apparaître immédiatement, et tu peux continuer à glisser le doigt vers le haut/bas dans ce même geste pour régler le son.
+
+## v1.10.2 — 23 octobre 2026
+
+- **Trouvé la vraie cause de la barre de volume invisible — spécifique au tactile.** `touch-action:pan-y` était posé sur la zone de swipe, ce qui dit explicitement à Chromium (le moteur derrière Electron) de prendre lui-même en charge le geste vertical, comme un scroll natif. Sur tactile, ça annulait notre propre geste (volume) en plein milieu, avant que la barre ait eu le temps de s'afficher — alors qu'à la souris, cette propriété n'a aucun effet, donc ça marchait très bien (ce qui m'a mis sur la piste). Remplacé par `touch-action:none`, puisqu'on gère déjà nous-mêmes les deux axes (horizontal = changer de piste, vertical = volume). Merci d'avoir précisé que ça marchait à la souris — sans ce détail, je n'aurais pas trouvé celle-là.
+
+## v1.10.1 — 23 octobre 2026
+
+- **Trouvé et corrigé : "Could not reach Spotify" partout, et rien ne joue, même connecté.** La vraie cause : l'app vérifiait seulement si un jeton de connexion *existait*, jamais s'il était encore valide. Si ce jeton était mort (révoqué, ou un reliquat de l'ancien dossier de stockage d'avant le correctif v1.9.2), l'app continuait d'afficher "Connecté" alors qu'aucun appel à Spotify ne pouvait réellement passer. Maintenant, si ça arrive, l'app efface ce jeton mort, affiche "Not connected" dans Settings, et te dit clairement d'aller te reconnecter — au lieu du message vague d'avant. **Si tu vois encore "Could not reach Spotify" après cette mise à jour : va dans Settings et reconnecte-toi à Spotify.** Si le problème persiste même après une reconnexion fraîche, dis-le-moi, ce serait autre chose.
+- **Barre de volume invisible en idle, corrigé.** En mode immersif (idle), la pochette d'album récupère l'espace normalement réservé à la barre de volume (puisqu'elle est censée être cachée). Mais quand tu glissais le doigt pour ajuster le son, cet espace n'était jamais restitué à la barre, qui redevenait donc techniquement visible mais écrasée par la pochette, désormais énorme. C'est corrigé : l'espace est maintenant restitué pendant que tu glisses, pochette comprise.
+- Immersive mode : délai par défaut avant l'effacement de l'interface passé de 3 à 5 secondes.
+
+## v1.10.0 — 23 octobre 2026
+
+**Nouveau réglage : "Ghost Spotify"** (désactivé par défaut, dans Settings). Une fois activé : quand Simple Player détecte qu'aucun appareil Spotify n'est actif nulle part (au lancement, et chaque fois qu'une commande échoue avec "no active device"), il lance automatiquement le **vrai client Spotify officiel** installé sur ton ordinateur, en arrière-plan, et tente de le masquer de la barre des tâches. Quand tu fermes Simple Player, ce Spotify "fantôme" se ferme avec lui — mais seulement celui que Simple Player a lui-même lancé ; si tu avais déjà Spotify ouvert avant, il n'y touche pas.
+
+À savoir avant de l'activer :
+- Fonctionne uniquement avec la **version installeur classique** de Spotify (celle de spotify.com), pas la version Microsoft Store. Si Simple Player ne trouve pas `Spotify.exe` automatiquement, un bouton apparaît dans Settings pour le localiser toi-même.
+- Le masquage complet de la fenêtre utilise une manipulation Windows bas niveau (pas une fonctionnalité officielle de Spotify) — ça devrait marcher, mais si Spotify change la structure de son application un jour, ça peut recommencer à apparaître brièvement, sans que ce soit un bug de Simple Player en tant que tel. Dis-moi si tu vois la fenêtre Spotify apparaître/rester visible, pour que j'ajuste.
+- **Je n'ai pas pu tester ça moi-même** (pas de Windows ni de Spotify installés dans mon environnement) — c'est du code écrit selon les API Windows documentées, mais le vrai test, c'est le tien. N'hésite pas à me dire précisément ce qui se passe si ce n'est pas parfait du premier coup.
+
+## v1.9.2 — 23 octobre 2026
+
+- **Trouvé et corrigé : la position de la fenêtre (et d'autres réglages) qui semblait ne pas être enregistrée.** La vraie cause : selon la façon dont l'app était lancée (via `run.bat` en mode développement, ou via la version installée), Windows et Electron ne se mettaient pas d'accord sur **quel dossier** utiliser pour sauvegarder tes réglages (`%APPDATA%\simple-player` d'un côté, `%APPDATA%\Simple Player` de l'autre). Du coup, position de fenêtre, zoom, démarrage automatique, et même ta connexion Spotify, pouvaient sembler "oubliés" simplement parce qu'ils avaient été écrits dans l'autre dossier la fois précédente. C'est maintenant corrigé : un seul dossier est utilisé, peu importe comment tu lances l'app. J'ai aussi ajouté une sauvegarde de sécurité supplémentaire au moment de la fermeture, au cas où Windows interromprait l'app avant qu'elle ait fini de sauvegarder normalement.
+  - **Si tu utilises la version installée (le `.exe`) depuis le début**, rien ne devrait changer pour toi : c'est déjà le dossier qu'elle utilisait. Si en revanche tu as aussi testé via `run.bat`, ces réglages-là (position de fenêtre, et potentiellement la connexion Spotify) ne seront pas récupérés automatiquement — il faudra juste re-régler la fenêtre et te reconnecter à Spotify une fois après cette mise à jour, après quoi ça restera stable.
+
+## v1.9.1 — 23 octobre 2026
+
+- Les erreurs Spotify sont maintenant précises partout (play/pause/suivant/précédent/shuffle/repeat/Library/Search) : si Spotify refuse une commande parce qu'**aucun appareil n'est actif**, tu vois maintenant exactement ce message au lieu de "Could not reach Spotify" ou d'un échec silencieux. C'est très probablement la vraie cause de ce que tu observais.
+
 ## v1.9.0 — 23 octobre 2026
 
 - Dans **Library**, tes **vraies playlists** s'affichent maintenant en premier. **Liked Songs** vient après, et apparaît comme un dossier replié (juste une rangée avec le nombre de chansons) — clique dessus pour dérouler la liste complète.
