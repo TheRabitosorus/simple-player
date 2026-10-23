@@ -280,9 +280,10 @@ function setLaunchAtStartup(enabled) {
 // active, so playback always has somewhere to go. This runs the user's
 // own, officially-installed Spotify.exe — nothing unofficial or
 // reverse-engineered — we just also hide its window and close it
-// together with Simple Player. Windows-only; requires the classic
-// (non-Microsoft-Store) Spotify installer. On by default (since v1.14.3).
-let ghostSpotifyPid = null; // only set when WE spawned it this session
+// together with Simple Player. Windows-only; works with the classic
+// installer (Spotify.exe) and the Microsoft Store version (started through
+// the spotify: link). On by default (since v1.14.3).
+let ghostLaunched = false; // true only if WE started Spotify this session
 
 function defaultSpotifyExePath() {
   return path.join(process.env.APPDATA || '', 'Spotify', 'Spotify.exe');
@@ -297,10 +298,10 @@ function resolveSpotifyExePath() {
 }
 
 // Best-effort: ask Windows to hide any visible top-level window owned by
-// the given process id. Spotify can take a few seconds to show its
+// a Spotify.exe process. Spotify can take a few seconds to show its
 // window after launch, and may replace it (e.g. after its own
 // auto-update check), so the caller retries this a couple of times.
-function hideWindowsOfPid(pid) {
+function hideSpotifyWindows() {
   if (process.platform !== 'win32') return;
   const script = [
     'Add-Type @"',
@@ -314,12 +315,14 @@ function hideWindowsOfPid(pid) {
     '  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);',
     '}',
     '"@',
-    `$targetPid = ${Number(pid)}`,
+    // By process name (not a single pid) so it works for the Microsoft Store
+    // version too, which we start through Windows rather than spawn directly.
+    '$targetPids = @(Get-Process -Name Spotify -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })',
     '[SPWin32]::EnumWindows({',
     '  param($hWnd, $lParam)',
     '  $procId = 0',
     '  [void][SPWin32]::GetWindowThreadProcessId($hWnd, [ref]$procId)',
-    '  if ($procId -eq $targetPid -and [SPWin32]::IsWindowVisible($hWnd)) {',
+    '  if ($targetPids -contains $procId -and [SPWin32]::IsWindowVisible($hWnd)) {',
     '    [void][SPWin32]::ShowWindow($hWnd, 0)',
     '  }',
     '  return $true',
@@ -345,37 +348,42 @@ function isSpotifyRunning() {
 }
 
 async function launchGhostSpotify() {
-  if (ghostSpotifyPid) return; // already launched one this session
-  const exe = resolveSpotifyExePath();
-  if (!exe) return;
-  if (await isSpotifyRunning()) return; // it's already up: its Connect device will show by itself
-  if (ghostSpotifyPid) return; // another call won the race while we checked
+  if (ghostLaunched) return; // already launched one this session
+  if (process.platform !== 'win32') return;
+  if (await isSpotifyRunning()) return; // already up: its Connect device will show by itself
+  if (ghostLaunched) return; // another call won the race while we checked
+  ghostLaunched = true;
   try {
-    const child = spawn(exe, ['--minimized'], { detached: true, stdio: 'ignore' });
-    ghostSpotifyPid = child.pid;
-    child.unref();
-    child.on('exit', () => { ghostSpotifyPid = null; });
+    const exe = resolveSpotifyExePath();
+    if (exe) {
+      // Classic installer: start Spotify.exe directly, minimized.
+      const child = spawn(exe, ['--minimized'], { detached: true, stdio: 'ignore' });
+      child.on('error', () => {});
+      child.unref();
+    } else {
+      // No Spotify.exe found (e.g. the Microsoft Store version, which lives in
+      // a protected folder): let Windows start whichever Spotify handles the
+      // spotify: link. Works for both kinds of install.
+      await shell.openExternal('spotify:');
+    }
     // Spotify takes a moment to show its window (and may briefly show a
     // login/update screen first), so try hiding it a few times.
-    [3000, 6000, 10000].forEach((delay) => {
-      setTimeout(() => { if (ghostSpotifyPid) hideWindowsOfPid(ghostSpotifyPid); }, delay);
+    [3000, 6000, 10000, 15000].forEach((delay) => {
+      setTimeout(() => { if (ghostLaunched) hideSpotifyWindows(); }, delay);
     });
   } catch (err) {
-    // Silent: worst case the renderer's "Starting Spotify..." wait times out
-    // and the user sees a clear message.
+    ghostLaunched = false;
+    // Silent: the renderer's "Starting Spotify..." wait then times out and
+    // the user gets a clear message.
   }
 }
 
 function killGhostSpotifyIfAny() {
-  if (!ghostSpotifyPid) return;
-  const pid = ghostSpotifyPid;
-  ghostSpotifyPid = null;
-  if (process.platform === 'win32') {
-    // /T also closes any helper processes Spotify launched under it.
-    execFile('taskkill', ['/PID', String(pid), '/T', '/F'], () => {});
-  } else {
-    try { process.kill(pid); } catch (err) {}
-  }
+  if (!ghostLaunched) return;
+  ghostLaunched = false;
+  // Closes the Spotify we started (and its helper processes). Never runs if
+  // Spotify was already open when Simple Player started.
+  execFile('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], () => {});
 }
 
 // Explicit, manual fallback for the position/size memory above — a
@@ -435,7 +443,7 @@ ipcMain.handle('spotify:get-access-token', async () => {
 // the renderer's NO_ACTIVE_DEVICE handling ---
 ipcMain.handle('ghost:get-settings', () => ({
   enabled: store.get('ghostSpotifyEnabled'),
-  exePath: resolveSpotifyExePath(),
+  exePath: resolveSpotifyExePath(), // null is fine: the Store version is started via the spotify: link
   platformSupported: process.platform === 'win32',
   // Spotify's desktop app names its Connect device after the computer.
   computerName: os.hostname()

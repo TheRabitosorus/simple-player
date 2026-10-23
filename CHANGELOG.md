@@ -2,6 +2,22 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.16.1 — 23 octobre 2026
+
+- **Mode idle : la zone du volume ne prend plus tout l'espace à droite de la pochette.** C'est maintenant une bande collée au bord droit (environ 45 % de l'espace libre, entre 48 et 120 px). Le reste de cet espace redevient une zone normale, où le **double tap** fait sortir du mode immersif (il était bloqué avant, car la zone de volume interceptait les taps).
+
+## v1.16.0 — 23 octobre 2026
+
+- **Support de la version Microsoft Store de Spotify.** Si `Spotify.exe` n'est pas trouvé (la version Store est installée dans un dossier protégé), Ghost Spotify démarre maintenant Spotify en passant par Windows (le lien `spotify:`), ce qui marche pour les deux types d'installation. Plus besoin de renseigner `Spotify.exe` dans ce cas. Si tu as la version classique à un endroit inhabituel, tu peux toujours le localiser dans les réglages.
+- La fenêtre de Spotify est masquée et fermée avec Simple Player par **nom de processus** (et non plus par un seul identifiant), pour fonctionner aussi avec la version Store. Si Spotify était déjà ouvert quand tu lances Simple Player, il n'est ni touché ni fermé.
+- Le popup n'apparaît plus qu'en dernier recours (Spotify introuvable ou qui ne démarre pas après 25 s), avec un texte adapté aux deux versions. Pense à être **connecté** dans Spotify sur le PC.
+- **Limite connue :** Spotify étant lancé par Windows, il peut faire apparaître sa fenêtre 1 à 3 secondes avant d'être masqué. Je n'ai pas pu tester la version Store ici.
+
+## v1.15.1 — 23 octobre 2026
+
+- **Popup « Spotify.exe not set ».** Quand Simple Player doit démarrer Spotify sur ton ordinateur (ou reçoit « No active device ») et ne connaît pas l'emplacement de `Spotify.exe`, il ne reste plus bloqué avec un message vague : il affiche un petit popup avec trois choix — **Locate Spotify.exe…** (choisir le fichier tout de suite), **Open Settings** (ouvre la page des réglages) ou **Later**. Il n'attend plus 25 secondes pour rien dans ce cas.
+- Message de délai dépassé plus précis : si Spotify est bien trouvé mais n'apparaît pas, l'app rappelle de vérifier qu'il est installé (version classique) et que tu y es **connecté**.
+
 ## v1.15.0 — 23 octobre 2026
 
 - **La musique joue sur TON ORDINATEUR, pas sur le téléphone.** Avant, Ghost Spotify ne démarrait Spotify que s'il n'y avait *aucun* appareil actif — donc si le téléphone était actif, rien ne se passait côté PC. Maintenant, avec Ghost Spotify activé :

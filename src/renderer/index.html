@@ -274,6 +274,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .add-menu-item .check{margin-left:auto;width:16px;height:16px;color:var(--accent);flex:0 0 auto;}
 .add-menu-divider{height:1px;background:var(--border);margin:6px 2px;}
 
+#dialogBackdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px;}
+#dialogBox{max-width:360px;background:var(--bg-elev);border:1px solid var(--border);border-radius:18px;padding:22px 20px 16px;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);}
+#dialogBox h4{margin:0 0 8px;font-size:16px;color:var(--fg);}
+#dialogBox p{margin:0 0 16px;font-size:13.5px;line-height:1.5;color:var(--fg-dim);}
+#dialogBox .dlg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;}
+#dialogBox .dlg-actions button{padding:10px 16px;border-radius:12px;background:var(--bg-elev-2);color:var(--fg);font-weight:700;font-size:13px;}
+#dialogBox .dlg-actions button.primary{background:var(--accent);color:#0a0c0c;}
 #toast{
   position:fixed;left:50%;bottom:92px;transform:translateX(-50%);
   background:var(--bg-elev-2);border:1px solid var(--border);color:var(--fg);
@@ -525,7 +532,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             <button class="pill" data-value="off">Off</button>
             <button class="pill" data-value="on">On</button>
           </div>
-          <p class="settings-note" id="ghostNote">Requires the standard Spotify desktop installer (not the Microsoft Store version), on the computer running Simple Player.</p>
+          <p class="settings-note" id="ghostNote">Works with the Spotify desktop app, classic or Microsoft Store version, on the computer running Simple Player. You must be logged in to Spotify there.</p>
           <button id="ghostPickExeBtn" class="link-btn" hidden>Locate Spotify.exe…</button>
         </div>
 
@@ -889,14 +896,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var size = Math.max(40, Math.min(cap, rect.width, rect.height));
     $art.style.width = size + 'px';
     $art.style.height = size + 'px';
-    // The idle-mode volume reveal zone spans from the art's actual right
-    // edge to the window's edge — recompute it here too, since this is
+    // The idle-mode volume reveal zone is a strip against the window's right
+    // edge, sized from the free space beside the art — recompute it here too, since this is
     // the one place art's size is known to have just changed (idle
     // entry/exit, resize, zoom, tab switches all already call this).
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
       var artRect = $art.getBoundingClientRect();
-      idleZone.style.left = (artRect.right + 8) + 'px';
+      var parentRect = (idleZone.offsetParent || document.body).getBoundingClientRect();
+      var gapLeft = artRect.right + 8 - parentRect.left;   // just right of the cover
+      var gapWidth = Math.max(0, parentRect.width - gapLeft);
+      // Only a strip hugging the RIGHT edge is the volume zone (about 45% of
+      // the free space, 48-120px). The rest of the gap stays part of the
+      // normal tap area, so a double-tap there can leave immersive mode.
+      var strip = Math.min(gapWidth, Math.max(48, Math.min(120, gapWidth * 0.45)));
+      idleZone.style.left = (parentRect.width - strip) + 'px';
     }
   }
   window.addEventListener('resize', fitArtSquare);
@@ -1204,8 +1218,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   })();
 
   // ---------------- Volume reveal zone (idle mode) ----------------
-  // Covers the whole space between the cover art and the window's right
-  // edge (its bounds are kept in sync by fitArtSquare, above). While
+  // A strip against the window's right edge (about 45% of the space beside
+  // the cover; its bounds are kept in sync by fitArtSquare, above). The rest
+  // of that space stays free for the double-tap that leaves immersive mode. While
   // idle: a single tap here reveals the volume rail (sliding in from the
   // right); once revealed, dragging up/down in this same zone adjusts
   // the volume, like the always-visible rail does outside idle mode.
@@ -1335,6 +1350,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var $toast = document.getElementById('toast');
   var toastTimer = null;
   function showToast(msg){
+    if (!msg) return; // callers pass '' when a dialog already explained the problem
     $toast.textContent = msg;
     $toast.hidden = false;
     requestAnimationFrame(function(){ $toast.classList.add('show'); });
@@ -1559,7 +1575,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         note.textContent = 'Only available in the real Windows app — not in this preview.';
         if (pickBtn) pickBtn.hidden = true;
       } else if (!ghostSettings.exePath) {
-        note.textContent = "Couldn't find Spotify.exe automatically — locate it to finish turning this on.";
+        note.textContent = "No classic Spotify.exe found — the Microsoft Store version will be started instead. Only locate Spotify.exe if you use the classic version in a custom place.";
         if (pickBtn) pickBtn.hidden = !ghostSettings.enabled;
       } else {
         note.textContent = defaultNote;
@@ -1673,12 +1689,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   });
   document.getElementById('settingsExitBtn').addEventListener('click', goToPlayerTab);
 
-  document.getElementById('settingsBtn').addEventListener('click', function(){
+  function openSettingsView(){
     tabs.forEach(function(t){ t.classList.remove('active'); });
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
     document.getElementById('view-settings').classList.add('active');
     idle.clear();
-  });
+  }
+  document.getElementById('settingsBtn').addEventListener('click', openSettingsView);
   function goToPlayerTab(){
     tabs.forEach(function(t){ t.classList.toggle('active', t.dataset.view === 'player'); });
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
@@ -1954,6 +1971,38 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // If "Ghost Spotify" is enabled, this also asks main.js to launch a
   // hidden Spotify on this computer instead of just telling the user to
   // do it themselves. (ghostSettings is declared near the top of this file.)
+  // Popup shown when Spotify can't be started for lack of a known
+  // Spotify.exe (Ghost Spotify needs it). Offers to pick the file right
+  // away, or to open the Settings page where it is set.
+  var exeDialogOpen = false;
+  function showExeMissingDialog(){
+    if (exeDialogOpen) return;
+    exeDialogOpen = true;
+    var back = document.createElement('div');
+    back.id = 'dialogBackdrop';
+    var box = document.createElement('div');
+    box.id = 'dialogBox';
+    box.setAttribute('role', 'dialog');
+    box.innerHTML = '<h4>Spotify didn\u2019t start</h4>' +
+      '<p>Simple Player couldn\u2019t get Spotify running on this computer. Make sure Spotify is installed ' +
+      '(Microsoft Store or classic version) and that you are logged in to it. If it is the classic version in an unusual ' +
+      'place, locate Spotify.exe now, or do it later in Settings \u203A Ghost Spotify.</p>' +
+      '<div class="dlg-actions"><button class="later">Later</button><button class="settings">Open Settings</button><button class="primary pick">Locate Spotify.exe\u2026</button></div>';
+    function close(){ exeDialogOpen = false; back.remove(); }
+    box.querySelector('.later').addEventListener('click', close);
+    box.querySelector('.settings').addEventListener('click', function(){ close(); openSettingsView(); });
+    box.querySelector('.pick').addEventListener('click', function(){
+      window.simplePlayer.ghostPickExe().then(function(exePath){
+        ghostSettings.exePath = exePath;
+        close();
+        showToast(exePath ? 'Spotify.exe saved \u2014 press Play again.' : 'No file chosen.');
+        if (exePath) { var b = document.getElementById('ghostPickExeBtn'); if (b) b.hidden = true; }
+      });
+    });
+    back.appendChild(box);
+    document.body.appendChild(back);
+  }
+
   function friendlySpotifyError(err){
     if (err && err.reauthRequired) {
       return 'Your Spotify connection expired — go to Settings and reconnect.';
@@ -1966,7 +2015,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       return 'No Spotify device is active. Open Spotify on your phone, computer, or a speaker and press play there first.';
     }
     if (err && err.message === 'LOCAL_DEVICE_TIMEOUT') {
-      return "Spotify didn't start on this computer. Check that Spotify is installed (classic version) and that Settings > Ghost Spotify points to Spotify.exe.";
+      if (!ghostSettings.exePath) { showExeMissingDialog(); return ''; }
+      return "Spotify didn't appear on this computer. Make sure Spotify is installed (classic version) and that you are logged in to it, then try again.";
     }
     if (err && err.status === 403) return 'Spotify refused that (try again?)';
     if (err && err.status === 429) return 'Spotify is busy (too many requests) — wait a few seconds and retry.';
