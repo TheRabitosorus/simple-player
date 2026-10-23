@@ -44,23 +44,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 #app{height:100%;display:flex;flex-direction:column;position:relative;}
 
-/* ---------- Title bar ---------- */
-/* No bar/background — just the fullscreen button, floating top-right.
-   The brand name/dot/preview-note are kept in the markup (harmless) but
-   hidden; the window's title already carries the app name + version
-   (see main.js), so nothing is lost by dropping them from here. */
-#titlebar{
-  flex:0 0 auto;
-  padding-top:max(10px, env(safe-area-inset-top,0px));
-  padding-bottom:10px;
-  background:transparent;
-  border-bottom:none;
-  max-height:80px;
-  overflow:hidden;
-}
-#titlebar .px{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
-.tb-left,.tb-brand,.tb-note{display:none;}
-.tb-right{display:flex;align-items:center;gap:14px;}
 .playlist-badge{
   position:absolute;z-index:2;
   top:max(14px, env(safe-area-inset-top,0px));
@@ -69,12 +52,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   padding:6px 12px;border-radius:20px;white-space:nowrap;max-width:38vw;overflow:hidden;text-overflow:ellipsis;
   border:1px solid var(--border);
 }
-.tb-note{font-size:11px;color:var(--fg-faint);white-space:nowrap;display:none;}
-@media (min-width:520px){.tb-note{display:inline;}}
-.tb-icon-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:var(--fg-dim);flex:0 0 auto;}
-.tb-icon-btn:hover{background:var(--bg-elev-2);color:var(--fg);}
-.tb-icon-btn svg{width:17px;height:17px;}
-
 /* ---------- Views ---------- */
 #views{flex:1 1 auto;min-height:0;position:relative;}
 .view{position:absolute;inset:0;display:none;flex-direction:column;height:100%;}
@@ -101,8 +78,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* ---------- Mode immersif (3s sans interaction) ---------- */
 /* Reste visible : tique "liké", pastille playlist, titre + artiste. Le reste s'efface. */
 #tabbar{transition:opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;max-height:80px;overflow:hidden;}
-#titlebar{transition:background .4s ease, border-color .4s ease, max-height .4s ease, padding-top .4s ease, padding-bottom .4s ease;}
-.tb-brand,.tb-note,.tb-icon-btn{transition:opacity .35s ease;}
 #progressWrap,#transport{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;overflow:hidden;}
 #addToLibraryWrap{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;}
 #app.idle #addToLibraryWrap{overflow:hidden;}
@@ -113,9 +88,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #idleVolumeZone{position:absolute;top:0;bottom:0;right:0;left:100%;pointer-events:none;touch-action:none;}
 #app.idle #idleVolumeZone{pointer-events:auto;}
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
-#app.idle #titlebar{background:transparent;border-color:transparent;max-height:0;padding-top:0;padding-bottom:0;}
-#app.idle .tb-brand,#app.idle .tb-note,#app.idle .tb-icon-btn{opacity:0;pointer-events:none;}
-#app.idle #transport,#app.idle #addToLibraryWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 /* Hidden off to the right (not just faded out) while idle, but NOT inert:
    pointer-events stays enabled so a single tap here — the space between
@@ -374,20 +346,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 <div id="app">
 
-  <header id="titlebar">
-    <div class="px">
-      <div class="tb-left">
-        <span class="tb-brand"><span class="dot"></span>Simple Player</span>
-      </div>
-      <div class="tb-right">
-        <span class="tb-note">Preview — no real audio playback</span>
-        <button class="tb-icon-btn" id="fullscreenBtn" aria-label="Fullscreen" title="Fullscreen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-        </button>
-      </div>
-    </div>
-  </header>
-
   <main id="views">
 
     <!-- Lecture -->
@@ -561,16 +519,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         </div>
 
         <div class="lib-section">
-          <h3>Window position</h3>
-          <p class="settings-desc">Position and size are saved automatically whenever you move or resize the window. Use these if that ever doesn't seem to be happening.</p>
-          <div class="pill-group" id="windowPosButtons">
-            <button class="pill" id="savePositionBtn">Save current position</button>
-            <button class="pill" id="restorePositionBtn">Restore last saved</button>
-          </div>
-          <p class="settings-note" id="windowPosNote">Only works in the real Windows app — not in this preview.</p>
-        </div>
-
-        <div class="lib-section">
           <h3>Ghost Spotify</h3>
           <p class="settings-desc">When nothing is playing anywhere, automatically start a hidden Spotify on this computer so Play always has somewhere to go. Closes together with Simple Player.</p>
           <div class="pill-group" id="ghostGroup">
@@ -579,6 +527,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           </div>
           <p class="settings-note" id="ghostNote">Requires the standard Spotify desktop installer (not the Microsoft Store version), on the computer running Simple Player.</p>
           <button id="ghostPickExeBtn" class="link-btn" hidden>Locate Spotify.exe…</button>
+        </div>
+
+        <!-- RULE: "Window position" must always stay the LAST section of Settings. Add any new setting ABOVE this line. -->
+        <div class="lib-section">
+          <h3>Window position</h3>
+          <p class="settings-desc">Position and size are saved automatically whenever you move or resize the window. Use these if that ever doesn't seem to be happening.</p>
+          <div class="pill-group" id="windowPosButtons">
+            <button class="pill" id="savePositionBtn">Save current position</button>
+            <button class="pill" id="restorePositionBtn">Restore last saved</button>
+          </div>
+          <p class="settings-note" id="windowPosNote">Only works in the real Windows app — not in this preview.</p>
         </div>
       </div>
 
@@ -943,6 +902,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function play(){
     if (useRealPlayback){
+      if (playSavedTrack()) return; // reopened with nothing loaded: resume last music
       // Shown immediately rather than waiting for the next ~2s poll —
       // without this, pressing play/pause visibly does nothing for up
       // to 2 seconds. The next poll still confirms/corrects it either way.
@@ -1278,7 +1238,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     zone.addEventListener('pointermove', function(e){
       if (!dragging) return;
       var dy = e.clientY - startY;
-      var deltaVol = -(dy / 220) * 100; // same 220px-for-full-range mapping as elsewhere
+      var deltaVol = -(dy / 700) * 100; // 700px of finger travel = full range (calm, precise)
       state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
       if (updateVolumeDisplay) updateVolumeDisplay();
       if (onVolumeChange) onVolumeChange(state.volume);
@@ -1329,8 +1289,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
     var dragging = false;
     function notifyVolumeChange(){ if (onVolumeChange) onVolumeChange(state.volume); }
-    track.addEventListener('pointerdown', function(e){ dragging = true; track.setPointerCapture(e.pointerId); setFromClientY(e.clientY); notifyVolumeChange(); });
-    track.addEventListener('pointermove', function(e){ if (dragging){ setFromClientY(e.clientY); notifyVolumeChange(); } });
+    // A tap jumps to that spot; dragging afterwards moves the volume at
+    // 35% of the finger's travel, so small hand tremors don't swing it.
+    var DRAG_SENSITIVITY = 0.35, dragStartY = 0, dragStartVol = 0;
+    track.addEventListener('pointerdown', function(e){
+      dragging = true; track.setPointerCapture(e.pointerId);
+      setFromClientY(e.clientY); notifyVolumeChange();
+      dragStartY = e.clientY; dragStartVol = state.volume;
+    });
+    track.addEventListener('pointermove', function(e){
+      if (!dragging) return;
+      var h = track.getBoundingClientRect().height || 1;
+      var v = dragStartVol + ((dragStartY - e.clientY) / h) * 100 * DRAG_SENSITIVITY;
+      state.volume = Math.round(Math.max(0, Math.min(100, v)));
+      render(); notifyVolumeChange();
+    });
     track.addEventListener('pointerup', function(){ dragging = false; });
     muteBtn.addEventListener('click', function(){
       if (state.volume > 0){ lastVolume = state.volume; state.volume = 0; }
@@ -1580,7 +1553,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }
     }
 
-    wirePillGroup('ghostGroup', 'off', function(v){
+    wirePillGroup('ghostGroup', 'on', function(v){
       var enabled = (v === 'on');
       if (window.simplePlayer && window.simplePlayer.ghostSetEnabled) {
         window.simplePlayer.ghostSetEnabled(enabled).then(function(){
@@ -1888,14 +1861,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   });
   renderSearch('');
 
-  // ---------------- Fullscreen ----------------
-  document.getElementById('fullscreenBtn').addEventListener('click', function(){
-    try{
-      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){});
-      else document.exitFullscreen().catch(function(){});
-    }catch(e){}
-  });
-
   // ---------------- Real Spotify playback (account-wide remote control) ----------------
   // Simple Player works as a remote control + display for whatever is
   // currently playing on the account — on a phone, a speaker, this PC, or
@@ -2109,6 +2074,91 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   var lastKnownTrackId = null;
 
+  // ---------------- Resume last music ----------------
+  // The track (and the playlist/album it came from) + position are saved
+  // locally while playing. At startup, if Spotify has nothing loaded
+  // anywhere on the account, that music is started again from where it
+  // stopped. If something is already loaded on any device (playing or
+  // paused), we never override it.
+  var LAST_KEY = 'simplePlayer.lastPlayed';
+  var lastSaveAt = 0;
+  var resumeAttempted = false;
+
+  function rememberLastPlayed(s){
+    if (!s || !s.item || !s.item.uri) return;
+    var now = Date.now();
+    if (now - lastSaveAt < 4000) return;
+    lastSaveAt = now;
+    var ctx = s.context && s.context.uri;
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify({
+        trackUri: s.item.uri,
+        // Only keep contexts that start with a track offset reliably.
+        contextUri: /^spotify:(playlist|album|artist):/.test(ctx || '') ? ctx : null,
+        positionMs: s.progress_ms || 0,
+        // Display info, so the last track can be shown on reopen without
+        // asking Spotify for it.
+        title: s.item.name || '',
+        artist: (s.item.artists || []).map(function(a){ return a.name; }).join(', '),
+        artUrl: (s.item.album && s.item.album.images && s.item.album.images[0]) ? s.item.album.images[0].url : '',
+        durationMs: s.item.duration_ms || 0
+      }));
+    } catch (e) { /* storage unavailable: just no resume next time */ }
+  }
+
+  // Nothing is ever started automatically. If Spotify has nothing loaded
+  // anywhere, the last track is only SHOWN (title, cover, position); the
+  // user starts it by pressing Play, which calls playSavedTrack().
+  var pendingSaved = null;
+
+  function showSavedTrackIfIdle(s){
+    if (s && s.item) { pendingSaved = null; return; } // Spotify has its own track: it wins
+    if (pendingSaved || resumeAttempted) return;
+    resumeAttempted = true;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(LAST_KEY) || 'null'); } catch (e) {}
+    if (!saved || !saved.trackUri) return;
+    pendingSaved = saved;
+    $title.textContent = saved.title || '';
+    $artist.textContent = saved.artist || '';
+    if (saved.artUrl) { $art.style.backgroundImage = cssUrl(saved.artUrl); updateNpBackgroundReal(saved.artUrl); }
+    if (saved.durationMs) {
+      realPlaybackMeta.durationMs = saved.durationMs;
+      $total.textContent = fmt(saved.durationMs / 1000);
+      state.elapsed = (saved.positionMs || 0) / 1000;
+      renderRealProgress();
+    }
+  }
+
+  // Returns true if it took over the Play press.
+  function playSavedTrack(){
+    var saved = pendingSaved;
+    if (!saved) return false;
+    pendingSaved = null;
+    var pos = Math.max(0, Math.floor(saved.positionMs || 0));
+    var withContext = saved.contextUri
+      ? { context_uri: saved.contextUri, offset: { uri: saved.trackUri }, position_ms: pos }
+      : null;
+    var trackOnly = { uris: [saved.trackUri], position_ms: pos };
+    function put(body){
+      return spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
+    }
+    state.playing = true;
+    setPlayIcon(true);
+    (withContext ? put(withContext) : put(trackOnly)).catch(function(err){
+      if (withContext && !(err && (err.reason === 'NO_ACTIVE_DEVICE' || err.status === 404 || err.reauthRequired))) {
+        return put(trackOnly); // context rejected: play just the track
+      }
+      throw err;
+    }).catch(function(err){
+      pendingSaved = saved; // let the next Play press try again
+      state.playing = false;
+      setPlayIcon(false);
+      showToast(friendlySpotifyError(err));
+    });
+    return true;
+  }
+
   function renderRealTrack(s){
     // s is the raw object returned by GET /me/player (a
     // "CurrentlyPlayingContext"), not the Web Playback SDK's shape.
@@ -2155,7 +2205,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function pollPlaybackState(){
     if (pollInFlight || document.hidden) return Promise.resolve();
     pollInFlight = true;
-    return spotifyApi('/me/player').then(renderRealTrack)
+    return spotifyApi('/me/player').then(function(s){
+      renderRealTrack(s);
+      rememberLastPlayed(s);
+      showSavedTrackIfIdle(s);
+    })
       .catch(function(){ /* transient network hiccup: next poll retries */ })
       .then(function(){ pollInFlight = false; });
   }

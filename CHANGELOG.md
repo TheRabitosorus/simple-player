@@ -2,6 +2,24 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.14.3 — 23 octobre 2026
+
+- **Ghost Spotify est maintenant activé par défaut.** Si tu l'avais laissé sur Off dans une ancienne version, il est passé sur On une seule fois au premier lancement de cette version; ensuite ton choix est toujours respecté. Au lancement (ou quand tu appuies sur Play), si aucun appareil Spotify n'est actif, il démarre Spotify masqué sur ton ordinateur — sans lancer de musique — et le ferme avec Simple Player.
+
+## v1.14.2 — 23 octobre 2026
+
+- **« Window position » est maintenant toujours la dernière section des réglages** (après Ghost Spotify). Une note dans le code rappelle que tout nouveau réglage s'ajoute au-dessus d'elle.
+
+## v1.14.1 — 23 octobre 2026
+
+- **Plus de démarrage automatique de la musique à l'ouverture.** À la réouverture, si Spotify n'a rien de chargé, Simple Player affiche simplement la dernière piste (titre, pochette, position) en pause. **La musique ne démarre que quand tu appuies sur Play**, et repart alors de la position sauvegardée. Si Spotify a déjà sa propre piste chargée, c'est elle qui s'affiche. (Précision : Ghost Spotify, lui, peut toujours démarrer Spotify masqué à l'ouverture s'il est activé — cela ne lance aucune musique.)
+
+## v1.14.0 — 23 octobre 2026
+
+- **Barre noire du haut supprimée complètement** (bouton plein écran compris). Le plein écran se fait maintenant avec la touche **F11**.
+- **Volume au toucher beaucoup moins sensible.** En mode idle, il faut maintenant 700 px de glissement pour couvrir toute la plage (avant : 220 px). Sur la barre de volume normale, un tap saute toujours à l'endroit touché, mais le glissement qui suit ne bouge le volume qu'à 35 % de la distance parcourue par le doigt.
+- **Reprise de la dernière musique.** Simple Player mémorise la piste (et la playlist/l'album d'où elle vient) ainsi que la position. À la réouverture, si Spotify n'a rien de chargé sur aucun appareil, la musique repart là où elle s'était arrêtée. Si quelque chose est déjà chargé (en lecture ou en pause), rien n'est écrasé. (Remplacé en v1.14.1 : la reprise ne démarre plus toute seule.)
+
 ## v1.13.0 — 23 octobre 2026
 
 **IMPORTANT — erreur de ma part dans l'emballage des zips (v1.9.2 à v1.12.0).** Ces zips contenaient un dossier racine `simple-player/` au lieu d'avoir les fichiers directement à la racine. Résultat : `deploy.bat` extrayait tout dans `F:\GitHub Repo\simple-player\simple-player\`, et `run.bat` continuait de lancer l'ancienne v1.9.1 restée à la racine. **Aucune des versions 1.9.2 à 1.12.0 n'a réellement tourné chez toi** — ce qui explique que rien ne changeait (position de fenêtre, immersif 5 s, volume, erreurs Spotify). Ce zip-ci est de nouveau à plat.

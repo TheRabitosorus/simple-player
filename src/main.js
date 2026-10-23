@@ -46,7 +46,8 @@ const store = new Store({
     windowMaximized: false,
     launchAtStartup: false,
     zoomFactor: 1.6,
-    ghostSpotifyEnabled: false,
+    ghostSpotifyEnabled: true,
+    ghostDefaultOnApplied: false,
     spotifyExePath: null
   }
 });
@@ -212,6 +213,11 @@ function createWindow() {
       event.preventDefault();
       return;
     }
+    if (input.key === 'F11') {
+      mainWindow.setFullScreen(!mainWindow.isFullScreen());
+      event.preventDefault();
+      return;
+    }
     if (input.key === ' ') {
       mainWindow.webContents.send('shortcut:toggle-play');
       event.preventDefault();
@@ -274,7 +280,7 @@ function setLaunchAtStartup(enabled) {
 // own, officially-installed Spotify.exe — nothing unofficial or
 // reverse-engineered — we just also hide its window and close it
 // together with Simple Player. Windows-only; requires the classic
-// (non-Microsoft-Store) Spotify installer. Off by default.
+// (non-Microsoft-Store) Spotify installer. On by default (since v1.14.3).
 let ghostSpotifyPid = null; // only set when WE spawned it this session
 
 function defaultSpotifyExePath() {
@@ -438,6 +444,15 @@ ipcMain.handle('ghost:no-active-device', () => {
 });
 
 app.whenReady().then(() => {
+  // One-time migration: Ghost Spotify became ON by default in v1.14.3. A
+  // `false` already written to the settings file by an older version is just
+  // the old default (the toggle never worked before), so switch it on once.
+  // After that, the user's own choice is always respected.
+  if (!store.get('ghostDefaultOnApplied')) {
+    store.set('ghostSpotifyEnabled', true);
+    store.set('ghostDefaultOnApplied', true);
+  }
+
   createWindow();
   createTray();
 
