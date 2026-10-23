@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.8.0 — 23 octobre 2026
+
+- **Important : retour en arrière sur la barre du bas.** La rendre cachée par défaut (depuis la v1.4.0) causait plus de problèmes qu'elle n'en résolvait — sa zone de détection a fini par voler les clics du bouton "+". La barre Player/Library/Search/Settings est donc de nouveau **toujours visible** (comme dans le mockup original), et se cache seulement en mode idle comme le reste de l'interface. Le bouton "+" refonctionne normalement : il ouvre bien le menu "ajouter à une playlist".
+- **Library** est maintenant bien centré sous le "+", avec **Player** et **Search** à égale distance de chaque côté.
+- **Shuffle et Repeat sont maintenant vraiment indépendants** : chacun ne touche plus que son propre bouton et son propre appel à Spotify — avant, une coïncidence de timing entre les deux pouvait donner l'impression qu'ils s'influençaient.
+- Le bouton **Play/Pause** change d'icône **immédiatement** au clic, au lieu d'attendre jusqu'à 2 secondes la prochaine vérification de l'état réel.
+- La **barre de progression** peut maintenant être glissée avec le doigt pour avancer/reculer dans la chanson (avant, seul un tap fonctionnait) — et sa zone tactile a aussi été élargie, comme celle du volume.
+
 ## v1.7.0 — 22 octobre 2026
 
 **La Bibliothèque et la Recherche sont maintenant réelles** — c'était le dernier gros morceau marqué comme fictif dans le projet.
