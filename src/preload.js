@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   onPreviousTrack: (callback) => ipcRenderer.on('shortcut:previous-track', () => callback()),
   onNextTrack: (callback) => ipcRenderer.on('shortcut:next-track', () => callback()),
 
+  // Turn the Space / Left / Right playback shortcuts off while typing.
+  setPlaybackShortcutsEnabled: (enabled) => ipcRenderer.invoke('shortcuts:set-enabled', enabled),
+
   getLaunchAtStartup: () => ipcRenderer.invoke('settings:get-launch-at-startup'),
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke('settings:set-launch-at-startup', enabled),
 
@@ -17,6 +20,11 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   getZoomFactor: () => ipcRenderer.invoke('display:get-zoom-factor'),
   setZoomFactor: (factor) => ipcRenderer.invoke('display:set-zoom-factor', factor),
   onZoomChanged: (callback) => ipcRenderer.on('zoom:changed', (event, factor) => callback(factor)),
+
+  // Windows master volume (see main.js). volumeGet resolves to 0-100 or null.
+  volumeIsSupported: () => ipcRenderer.invoke('volume:is-supported'),
+  volumeGet: () => ipcRenderer.invoke('volume:get'),
+  volumeSet: (percent) => ipcRenderer.invoke('volume:set', percent),
 
   spotifyGetStatus: () => ipcRenderer.invoke('spotify:get-status'),
   spotifyConnect: () => ipcRenderer.invoke('spotify:connect'),

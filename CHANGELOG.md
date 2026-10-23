@@ -2,6 +2,58 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.19.2 — 23 octobre 2026
+
+- **Mode idle : symbole play/pause sur la pochette.**
+  - En pause : le symbole reste visible en permanence, dans le vert de l'interface.
+  - Quand on appuie sur play : le symbole s'affiche brièvement, puis disparaît en fondu sur environ une seconde.
+- **Correction du tap sur la pochette en idle.** Le clic n'était pas détecté à cause du pointer capture sur la zone de swipe. La bascule play/pause se fait maintenant dans le gestionnaire `onUp`, ce qui règle le problème.
+
+## v1.19.1 — 23 octobre 2026
+
+- **Mode idle : les boutons play/pause/next/shuffle/repeat et le « + » sont de nouveau cachés.** Cause trouvée : en v1.14.0, quand j'ai supprimé la barre noire du haut, mon nettoyage du CSS a effacé par erreur, au passage, la règle qui cache ces boutons en mode idle (elle était écrite sur la même ligne que les règles de l'ancienne barre). Règle remise. Vérifié dans un navigateur de test : en idle, il ne reste que la pochette, le titre, l'artiste et la coche « liké » ; boutons, barre de progression et barre du bas sont masqués et non cliquables.
+
+## v1.19.0 — 23 octobre 2026
+
+- **Bibliothèque présentée comme dans Spotify.** Les playlists sont maintenant une **liste** (pochette à gauche, nom en gras, « Playlist · propriétaire » dessous) au lieu d'une grille, et **Liked Songs est épinglé tout en haut**, comme dans l'app officielle.
+- **Bug trouvé et corrigé : la liste « Liked Songs » restait toujours dépliée** (jusqu'à 100 chansons) même si le dossier devait être replié. Une règle CSS écrasait l'attribut « caché ». Elle ne s'ouvre maintenant que quand on la touche.
+- **Ordre des playlists.** L'API de Spotify ne donne pas l'ordre « Récents » de l'app officielle. Simple Player l'approche : les playlists que tu as jouées depuis Simple Player passent en premier (la plus récente en haut), les autres gardent l'ordre renvoyé par Spotify. Il ne sera donc pas identique à Spotify au début, et se rapproche de ton usage avec le temps.
+- **Menu « + » (ajouter à une playlist).** Je l'ai testé avec de fausses données et il s'affiche correctement. Si la liste réelle ne peut pas être chargée, il affiche maintenant la **raison** au lieu d'une liste vide. La récupération des playlists est plus robuste (toutes les pages, page plus petite si Spotify refuse 50, et seulement tes playlists ou celles collaboratives, puisque l'ajout n'est possible que dans celles-là) et le même ordre s'y applique.
+
+## v1.18.2 — 23 octobre 2026
+
+- **« Could not reach Spotify » alors que l'action fonctionne.** Cause la plus probable (je n'ai pas pu la reproduire ici) : pour certaines commandes (next, previous, shuffle, repeat), Spotify répond « OK » avec un corps vide ou qui n'est pas du JSON. L'app essayait de le lire quand même, échouait, et traitait ça comme une erreur de connexion alors que la commande avait réussi. Maintenant une réponse OK est toujours traitée comme un succès.
+- **Bouton Shuffle (et Repeat) : vrai on/off.** La même erreur fantôme faisait revenir le bouton en arrière juste après l'appui, d'où les appuis multiples nécessaires. De plus, après un appui, l'app ignore pendant 5 s (au lieu de 3) les états renvoyés par Spotify, qui peut mettre du temps à se mettre à jour, pour que le bouton ne clignote pas.
+
+## v1.18.1 — 23 octobre 2026
+
+- **Barre de progression (déplacement dans le temps) beaucoup plus facile à attraper au toucher.** Vraie cause du bug : la zone tactile invisible autour de la barre était coupée par le conteneur (qui masque son débordement), donc un doigt posé juste à côté de la ligne fine de 5 px tombait sur la pochette et changeait de piste. Maintenant la zone tactile est un vrai espace autour de la barre (22 px au-dessus et en dessous, 24 px de chaque côté, environ 55 px de haut au total contre 5 avant), et la barre visible est un peu plus épaisse (8 px). Glisser dessus ne peut plus déclencher Next/Previous.
+
+## v1.18.0 — 23 octobre 2026
+
+- **La recherche couvre tout le catalogue Spotify**, et plus seulement des chansons : résultats en sections **Songs, Artists, Albums, Playlists** (10 de chaque). Un clic sur un artiste, un album ou une playlist le joue en entier; un clic sur une chanson met en file les chansons listées à partir de celle-ci. Un bouton **More songs** charge 10 chansons de plus à chaque clic.
+- Avant, la requête demandait 20 résultats, ce que l'API Spotify refuse peut-être pour cette app : l'erreur était avalée et affichait « No results ». Maintenant la limite est de 10, et une vraie erreur s'affiche au lieu de « No results ».
+
+## v1.17.3 — 23 octobre 2026
+
+- **Raccourcis clavier désactivés pendant que tu tapes dans la recherche.** Tant que le curseur est dans la barre de recherche, Espace et les flèches gauche/droite servent à écrire et à déplacer le curseur, et ne contrôlent plus la lecture. Dès que tu quittes la barre (autre onglet, clic ailleurs), les raccourcis redeviennent actifs.
+
+## v1.17.2 — 23 octobre 2026
+
+- **Barre de recherche deux fois plus haute** (environ 90 px au lieu de 45), avec un texte et une loupe plus grands.
+
+## v1.17.1 — 23 octobre 2026
+
+- **Recherche : le curseur est déjà dans la barre de recherche** dès que tu ouvres l'onglet Search, tu peux taper tout de suite.
+
+## v1.17.0 — 23 octobre 2026
+
+- **Les barres de son règlent maintenant le volume de Windows** (le volume général de l'ordinateur), pas seulement celui de Spotify. Un petit programme PowerShell invisible tourne en arrière-plan pour parler à l'API audio de Windows (il démarre au premier usage et s'arrête avec l'app). La barre se synchronise aussi avec le volume réel de Windows toutes les 3 secondes (si tu changes le son avec le clavier ou la barre des tâches), sauf pendant que tu la touches. Hors Windows, elle retombe sur le volume Spotify. Le volume propre de Spotify n'est plus touché. Les mises à jour sont limitées en fréquence pour ne pas saturer.
+- **La barre de son du mode normal se comporte exactement comme celle du mode idle** : toucher ne fait plus « sauter » le volume, on glisse vers le haut/bas, et 700 px de glissement couvrent toute la plage (même constante pour les deux).
+- **Previous aussi instantané que Next.** Les pistes écoutées sont gardées en mémoire (et entre les sessions) avec leur pochette, qui est préchargée : un swipe vers l'arrière affiche tout de suite la pochette précédente. Avant, ça ne marchait que dans les 3 premières secondes d'une piste et jamais juste après la réouverture de l'app.
+- **Changement de comportement :** « previous » va toujours à la piste précédente. Si plus de 3 s de la piste avaient été jouées, Spotify la recommencerait normalement; l'app envoie maintenant un second « previous » juste après pour revenir vraiment en arrière. Dis-moi si tu préfères le comportement normal de Spotify.
+- **Limites :** je n'ai pas pu tester le programme de volume sous Windows. Une piste jouée avant la toute première utilisation de cette version n'a pas de pochette en mémoire.
+
 ## v1.16.1 — 23 octobre 2026
 
 - **Mode idle : la zone du volume ne prend plus tout l'espace à droite de la pochette.** C'est maintenant une bande collée au bord droit (environ 45 % de l'espace libre, entre 48 et 120 px). Le reste de cet espace redevient une zone normale, où le **double tap** fait sortir du mode immersif (il était bloqué avant, car la zone de volume interceptait les taps).

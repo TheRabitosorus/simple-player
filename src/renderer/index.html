@@ -88,7 +88,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #idleVolumeZone{position:absolute;top:0;bottom:0;right:0;left:100%;pointer-events:none;touch-action:none;}
 #app.idle #idleVolumeZone{pointer-events:auto;}
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
-#app.idle #progressWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
+#app.idle #progressWrap{opacity:0;max-height:0;margin:0;padding:0;pointer-events:none;}
+#app.idle #transport{opacity:0;max-height:0;margin:0;pointer-events:none;}
+#app.idle #addToLibraryWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
 /* Hidden off to the right (not just faded out) while idle, but NOT inert:
    pointer-events stays enabled so a single tap here — the space between
    the cover art and the window's edge — is caught (see JS) even though
@@ -138,19 +140,29 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   opacity:0;transition:opacity .18s, background .18s;
 }
 #art:active .art-overlay,#art.paused .art-overlay{opacity:1;background:rgba(0,0,0,.28);}
-#art .art-overlay svg{width:30%;height:30%;color:#fff;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
+/* Immersive (idle) mode: while paused the symbol stays on the cover (rule
+   above). When playing resumes, the symbol shows for 1 s (.flash, set from
+   JS) and then fades out slowly. */
+#app.idle #art .art-overlay{transition:opacity .8s ease, background .8s ease;}
+#app.idle #art.flash .art-overlay{opacity:1;background:rgba(0,0,0,.28);transition:opacity .1s ease, background .1s ease;}
+#art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{text-align:center;max-width:min(80vw,420px);}
 #trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
-#progressWrap{width:min(78vw,420px);flex:0 0 auto;}
-#progressBar{height:5px;border-radius:3px;background:var(--bg-elev-2);cursor:pointer;touch-action:none;position:relative;}
+/* The wrap itself is the touch target: a bar is only 8px high, so generous
+   invisible padding around it (22px above/below, 24px each side, cancelled by
+   negative margins so the layout barely changes) gives a finger real room.
+   It must be padding, not a ::before overflow: the wrap clips its overflow
+   (needed for the idle collapse), which used to cut the old hit area off and
+   let a drag along the bar fall through to the swipe-to-change-track zone. */
+#progressWrap{width:min(78vw,420px);flex:0 0 auto;box-sizing:content-box;padding:22px 24px;margin:-12px -24px;touch-action:none;cursor:pointer;}
+#progressBar{height:8px;border-radius:4px;background:var(--bg-elev-2);cursor:pointer;touch-action:none;position:relative;}
 /* Same trick as the volume rail: a wider, invisible hit area layered
    over the thin visible bar, so a finger has real room to land on it. */
-#progressBar::before{content:'';position:absolute;left:0;right:0;top:-12px;bottom:-12px;}
-#progressFill{height:100%;width:0%;background:var(--accent);border-radius:3px;transition:width .18s linear;}
+#progressFill{height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .18s linear;}
 #timeRow{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono-font);font-variant-numeric:tabular-nums;font-size:14px;color:var(--fg-dim);}
 
 #transport{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3vw,26px);flex:0 0 auto;}
@@ -189,6 +201,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .liked-folder[aria-expanded="true"] .liked-folder-chevron{transform:rotate(90deg);}
 #likedList{margin-top:10px;}
 
+/* An element with the hidden attribute must really be hidden, even when a rule
+   above gives it a display value (the collapsed Liked Songs list used to show). */
+[hidden]{display:none !important;}
 .track-list{display:flex;flex-direction:column;gap:2px;}
 .track-row{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:10px;}
 .track-row:hover{background:var(--bg-elev);}
@@ -199,7 +214,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .track-row .dur{font-family:var(--mono-font);font-size:11px;color:var(--fg-faint);flex:0 0 auto;font-variant-numeric:tabular-nums;}
 .track-row.playing .ttl{color:var(--accent);}
 
+.playlist-grid.as-list{display:flex;flex-direction:column;gap:2px;}
+.pl-row{display:flex;align-items:center;gap:14px;padding:8px 6px;border-radius:10px;cursor:pointer;}
+.pl-row:hover,.pl-row:active{background:var(--bg-elev);}
+.pl-row .cover{width:58px;height:58px;border-radius:6px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+.pl-row .meta{min-width:0;flex:1 1 auto;}
+.pl-row .name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pl-row .sub{font-size:12.5px;color:var(--fg-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
 .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;}
+.search-section{margin:18px 4px 4px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint);}
+.search-more{display:block;margin:10px auto 4px;padding:10px 18px;border-radius:12px;background:var(--bg-elev-2);color:var(--fg);font-weight:700;font-size:13px;}
+.track-row.ctx{cursor:pointer;}
+.track-row.ctx .thumb.round{border-radius:50%;}
 .pl-card{cursor:pointer;}
 .pl-card .cover{aspect-ratio:1;border-radius:12px;background-size:cover;background-position:center;margin-bottom:8px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);transition:transform .12s;}
 .pl-card:hover .cover{transform:translateY(-2px);}
@@ -235,10 +261,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .pill.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
 
 .search-bar{position:relative;margin-top:14px;flex:0 0 auto;}
-.search-bar svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--fg-faint);}
+.search-bar svg{position:absolute;left:20px;top:50%;transform:translateY(-50%);width:26px;height:26px;color:var(--fg-faint);}
 .search-bar input{
-  width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:11px;
-  padding:13px 14px 13px 38px;color:var(--fg);font-family:var(--body-font);font-size:14px;outline:none;
+  /* Twice as tall as before (about 90px) so it is easy to see and to tap. */
+  width:100%;height:90px;box-sizing:border-box;background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;
+  padding:0 20px 0 60px;color:var(--fg);font-family:var(--body-font);font-size:20px;outline:none;
 }
 .search-bar input:focus{border-color:var(--accent);}
 .search-empty{color:var(--fg-faint);font-size:13px;padding:30px 4px;text-align:center;}
@@ -430,10 +457,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       <div class="scroller px">
         <h2>Library</h2>
         <div class="lib-section">
-          <h3>Playlists</h3>
-          <div class="playlist-grid" id="playlistGrid"></div>
-        </div>
-        <div class="lib-section">
           <button class="liked-folder" id="likedFolderBtn" aria-expanded="false" aria-controls="likedList">
             <div class="liked-folder-icon">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
@@ -443,6 +466,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             <svg class="liked-folder-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
           </button>
           <div class="track-list" id="likedList" hidden></div>
+        </div>
+        <div class="lib-section">
+          <h3>Playlists</h3>
+          <div class="playlist-grid" id="playlistGrid"></div>
         </div>
       </div>
     </section>
@@ -793,7 +820,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Set by startPolling() once connected to Spotify; everything below
   // falls back to the local simulation until then.
   var useRealPlayback = false;
-  var onVolumeChange = null; // wired to the real Spotify API once connected
+  var onVolumeChange = null; // wired to the Windows volume (or Spotify's) below
+  // Finger travel needed to sweep the whole 0-100 range. Used by BOTH volume
+  // controls (idle zone and normal-mode rail) so they behave identically.
+  var VOLUME_DRAG_PX = 700;
   var updateVolumeDisplay = null; // set by the volume rail; also used by the swipe-to-adjust-volume gesture
 
   // ---------------- DOM refs ----------------
@@ -968,7 +998,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (state.timer){ clearInterval(state.timer); state.timer = null; }
   }
 
-  function togglePlay(){ state.playing ? pause() : play(); }
+  // In immersive mode, show the new play/pause symbol on the cover for 1 s,
+  // then let CSS fade it out.
+  var flashTimer = null;
+  function flashPlayState(){
+    if (!document.getElementById('app').classList.contains('idle')) return;
+    $art.classList.add('flash');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(function(){ $art.classList.remove('flash'); }, 1000);
+  }
+  function togglePlay(){ state.playing ? pause() : play(); flashPlayState(); }
 
   function pickNextIndex(){
     if (state.shuffle && state.queue.length > 1){
@@ -1002,15 +1041,25 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
   function prev(skipShake){
     if (useRealPlayback){
-      // Spotify restarts the current track instead of going back when more
-      // than ~3 s have played; only swap the cover when it will really go back.
-      if (state.elapsed < 3 && trackHistory.length) {
+      // A swipe/press on "previous" means the previous TRACK. Spotify's own
+      // rule is "restart the current track if more than ~3 s have played",
+      // so in that case a second 'previous' is sent right after the first.
+      var restartsFirst = state.elapsed >= 3;
+      if (trackHistory.length) {
         lastOptimisticAt = Date.now();
         var back = trackHistory.pop();
+        saveHistory();
         if (currentRealItem) queueItems.unshift(currentRealItem);
         showRealTrackDisplay(back);
         state.elapsed = 0;
         renderRealProgress();
+      }
+      if (restartsFirst) {
+        spotifyApi('/me/player/previous', { method: 'POST' }).catch(function(){});
+        setTimeout(function(){
+          spotifyApi('/me/player/previous', { method: 'POST' }).then(pollSoon).catch(function(err){ showToast(friendlySpotifyError(err)); });
+        }, 350);
+        return;
       }
       spotifyApi('/me/player/previous', { method: 'POST' }).then(pollSoon).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
     state.index = pickPrevIndex();
@@ -1059,7 +1108,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   // ---------------- Controls ----------------
   document.getElementById('playBtn').addEventListener('click', togglePlay);
-  $art.addEventListener('click', togglePlay);
   document.getElementById('nextBtn').addEventListener('click', function(){ next(false); });
   document.getElementById('prevBtn').addEventListener('click', prev);
   $shuffleBtn.addEventListener('click', toggleShuffle);
@@ -1070,6 +1118,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // already works.
   (function(){
     var seekDragging = false;
+    var $seekTarget = document.getElementById('progressWrap');
     function pctFromClientX(clientX){
       var r = $progressBar.getBoundingClientRect();
       return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
@@ -1099,21 +1148,22 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }
       previewSeek(pct); // demo mode has no server round-trip to wait on
     }
-    $progressBar.addEventListener('pointerdown', function(e){
+    $seekTarget.addEventListener('pointerdown', function(e){
       seekDragging = true;
-      try { $progressBar.setPointerCapture(e.pointerId); } catch(err){}
+      try { $seekTarget.setPointerCapture(e.pointerId); } catch(err){}
+      e.preventDefault();
       previewSeek(pctFromClientX(e.clientX));
     });
-    $progressBar.addEventListener('pointermove', function(e){
+    $seekTarget.addEventListener('pointermove', function(e){
       if (!seekDragging) return;
       previewSeek(pctFromClientX(e.clientX));
     });
-    $progressBar.addEventListener('pointerup', function(e){
+    $seekTarget.addEventListener('pointerup', function(e){
       if (!seekDragging) return;
       seekDragging = false;
       commitSeek(pctFromClientX(e.clientX));
     });
-    $progressBar.addEventListener('pointercancel', function(){ seekDragging = false; });
+    $seekTarget.addEventListener('pointercancel', function(){ seekDragging = false; });
   })();
 
   // ---------------- Swipe (changer de titre, pochette suit le doigt) ----------------
@@ -1127,6 +1177,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
     var lastTapTime = 0;
+    var downOnArt = false; // did this touch start on the cover?
 
     function noTransition(){ $art.style.transition = 'none'; }
     function releaseToCss(expectedGen, delay){
@@ -1136,6 +1187,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function onDown(e){
       if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap')) return;
       genId++;
+      downOnArt = !!e.target.closest('#art');
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
       try { zone.setPointerCapture(pid); } catch(err){}
@@ -1196,11 +1248,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
         else snapBack();
       } else if (locked === null){
-        // A tap, not a drag. Each tap still toggles play/pause on its own
-        // (via #art's click listener below) — this only additionally
-        // tracks whether two taps landed close together in time, which is
+        // A tap, not a drag. Each tap on the cover toggles play/pause on its
+        // own (see below) — this also tracks whether two taps landed close together in time, which is
         // the one thing allowed to dismiss immersive mode. Toggling twice
         // cancels out, so a double-tap leaves playback state unchanged.
+        // The toggle is done HERE rather than in a 'click' listener on the
+        // cover: this zone holds pointer capture during the gesture, which
+        // makes the browser aim the click at the zone instead of the cover.
+        if (downOnArt) togglePlay();
         var now = Date.now();
         if (now - lastTapTime < 350){
           lastTapTime = 0;
@@ -1267,7 +1322,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     zone.addEventListener('pointermove', function(e){
       if (!dragging) return;
       var dy = e.clientY - startY;
-      var deltaVol = -(dy / 700) * 100; // 700px of finger travel = full range (calm, precise)
+      var deltaVol = -(dy / VOLUME_DRAG_PX) * 100;
       state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
       if (updateVolumeDisplay) updateVolumeDisplay();
       if (onVolumeChange) onVolumeChange(state.volume);
@@ -1310,29 +1365,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var level = state.volume === 0 ? 'mute' : (state.volume <= 33 ? 1 : (state.volume <= 66 ? 2 : 3));
       volIcon.innerHTML = VOL_ICONS[level];
     }
-    function setFromClientY(clientY){
-      var r = track.getBoundingClientRect();
-      var pct = 1 - Math.min(1, Math.max(0, (clientY - r.top) / r.height));
-      state.volume = Math.round(pct * 100);
-      render();
-    }
-    var dragging = false;
+    // Same behaviour as the idle-mode volume zone: touching does NOT jump
+    // the volume; dragging up/down moves it relative to where it was when
+    // the touch started, at VOLUME_DRAG_PX of finger travel for the full range.
+    var dragging = false, dragStartY = 0, dragStartVol = 0, dragPid = null;
     function notifyVolumeChange(){ if (onVolumeChange) onVolumeChange(state.volume); }
-    // A tap jumps to that spot; dragging afterwards moves the volume at
-    // 35% of the finger's travel, so small hand tremors don't swing it.
-    var DRAG_SENSITIVITY = 0.35, dragStartY = 0, dragStartVol = 0;
     track.addEventListener('pointerdown', function(e){
-      dragging = true; track.setPointerCapture(e.pointerId);
-      setFromClientY(e.clientY); notifyVolumeChange();
+      dragging = true; dragPid = e.pointerId;
       dragStartY = e.clientY; dragStartVol = state.volume;
+      try { track.setPointerCapture(dragPid); } catch (err) {}
+      e.preventDefault();
     });
     track.addEventListener('pointermove', function(e){
       if (!dragging) return;
-      var h = track.getBoundingClientRect().height || 1;
-      var v = dragStartVol + ((dragStartY - e.clientY) / h) * 100 * DRAG_SENSITIVITY;
-      state.volume = Math.round(Math.max(0, Math.min(100, v)));
+      var v = dragStartVol - ((e.clientY - dragStartY) / VOLUME_DRAG_PX) * 100;
+      state.volume = Math.max(0, Math.min(100, v));
       render(); notifyVolumeChange();
     });
+    track.addEventListener('pointercancel', function(){ dragging = false; });
     track.addEventListener('pointerup', function(){ dragging = false; });
     muteBtn.addEventListener('click', function(){
       if (state.volume > 0){ lastVolume = state.volume; state.volume = 0; }
@@ -1396,7 +1446,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       });
     }
 
-    function renderMenuItems(realPls){
+    function renderMenuItems(realPls, errorText){
       menu.innerHTML = '';
       var likedItem = document.createElement('button');
       likedItem.className = 'add-menu-item';
@@ -1434,7 +1484,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (!realPls.length){
           var empty = document.createElement('div');
           empty.className = 'search-empty';
-          empty.textContent = 'No playlists found';
+          // Show WHY when the list couldn't be loaded, instead of a bare "none".
+          empty.textContent = errorText || 'No playlists found';
           menu.appendChild(empty);
         }
       } else {
@@ -1452,8 +1503,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     function buildMenu(){
       if (useRealPlayback){
-        renderMenuItems(realPlaylistsCache || []); // show immediately with whatever's cached (or empty)
-        fetchRealPlaylists().then(function(pls){ if (!menu.hidden) renderMenuItems(pls); });
+        renderMenuItems(sortPlaylistsLikeRecents(realPlaylistsCache || [])); // show immediately with whatever's cached (or empty)
+        fetchRealPlaylists().then(function(pls){ if (!menu.hidden) renderMenuItems(sortPlaylistsLikeRecents(pls)); })
+          .catch(function(err){ if (!menu.hidden) renderMenuItems([], friendlySpotifyError(err) || 'Could not load your playlists'); });
       } else {
         renderMenuItems(null);
       }
@@ -1685,11 +1737,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
       document.getElementById('view-' + tab.dataset.view).classList.add('active');
       if (tab.dataset.view === 'player'){ idle.activity(); fitArtSquare(); } else idle.clear();
+      if (tab.dataset.view !== 'search') setShortcuts(true); // safety: never leave shortcuts off
+      // Opening Search puts the cursor straight in the search box.
+      if (tab.dataset.view === 'search'){
+        var si = document.getElementById('searchInput');
+        // Next frame: the view has to be visible before it can take focus.
+        requestAnimationFrame(function(){ si.focus(); });
+      }
     });
   });
   document.getElementById('settingsExitBtn').addEventListener('click', goToPlayerTab);
 
   function openSettingsView(){
+    setShortcuts(true);
     tabs.forEach(function(t){ t.classList.remove('active'); });
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
     document.getElementById('view-settings').classList.add('active');
@@ -1771,26 +1831,35 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         renderLibraryPlayingState();
       });
 
+      grid.classList.add('as-list');
       grid.innerHTML = '<div class="search-empty">Loading…</div>';
       fetchRealPlaylists().then(function(pls){
         grid.innerHTML = '';
         if (!pls.length){ grid.innerHTML = '<div class="search-empty">No playlists found.</div>'; return; }
-        pls.forEach(function(pl){
+        sortPlaylistsLikeRecents(pls).forEach(function(pl){
           var img = (pl.images && pl.images[0]) ? pl.images[0].url : '';
-          var card = document.createElement('div');
-          card.className = 'pl-card';
-          card.innerHTML =
+          var owner = pl.owner && pl.owner.display_name ? pl.owner.display_name : '';
+          var row = document.createElement('div');
+          row.className = 'pl-row';
+          row.innerHTML =
             '<div class="cover" style="background-image:' + cssUrl(img) + ';background-color:var(--bg-elev-2);"></div>' +
-            '<div class="name"></div><div class="count"></div>';
-          card.querySelector('.name').textContent = pl.name;
-          card.querySelector('.count').textContent = (pl.tracks ? pl.tracks.total : 0) + ' tracks';
-          card.addEventListener('click', function(){
+            '<div class="meta"><div class="name"></div><div class="sub"></div></div>';
+          row.querySelector('.name').textContent = pl.name;
+          row.querySelector('.sub').textContent = 'Playlist' + (owner ? ' · ' + owner : '');
+          row.addEventListener('click', function(){
+            notePlaylistPlayed(pl.uri);
             playRealContext(pl.uri);
             renderLibraryPlayingState();
             goToPlayerTab();
           });
-          grid.appendChild(card);
+          grid.appendChild(row);
         });
+      }).catch(function(err){
+        grid.innerHTML = '';
+        var e = document.createElement('div');
+        e.className = 'search-empty';
+        e.textContent = friendlySpotifyError(err) || 'Could not load your playlists.';
+        grid.appendChild(e);
       });
       return;
     }
@@ -1846,15 +1915,71 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (useRealPlayback){
       if (!q){ searchResults.innerHTML = '<div class="search-empty">Type a song or artist name.</div>'; return; }
       searchResults.innerHTML = '<div class="search-empty">Searching…</div>';
-      searchRealTracks(q).then(function(tracks){
+      searchRealAll(q).then(function(res){
         if (searchInput.value.trim() !== q) return; // a newer query already superseded this one
         searchResults.innerHTML = '';
-        if (!tracks.length){ searchResults.innerHTML = '<div class="search-empty">No results for “' + escHtml(q) + '”.</div>'; return; }
-        var uris = tracks.map(function(t){ return t.uri; });
-        tracks.forEach(function(t, i){
-          searchResults.appendChild(trackRow(t, function(){ playRealUris(uris, i); }));
-        });
+        var tracks = res.tracks;
+        if (!tracks.length && !res.artists.length && !res.albums.length && !res.playlists.length){
+          searchResults.innerHTML = '<div class="search-empty">No results for “' + escHtml(q) + '”.</div>';
+          return;
+        }
+        if (tracks.length){
+          searchResults.appendChild(sectionTitle('Songs'));
+          var allTracks = tracks.slice();
+          var moreBtn = null;
+          var addTracks = function(list, from){
+            list.forEach(function(t, k){
+              var idx = from + k;
+              // Playing a song queues the songs listed so far, starting at it.
+              searchResults.insertBefore(trackRow(t, function(){ playRealUris(allTracks.map(function(x){ return x.uri; }), idx); }), moreBtn);
+            });
+          };
+          moreBtn = document.createElement('button');
+          moreBtn.className = 'search-more';
+          moreBtn.textContent = 'More songs';
+          searchResults.appendChild(moreBtn);
+          addTracks(tracks, 0);
+          moreBtn.addEventListener('click', function(){
+            moreBtn.disabled = true;
+            moreBtn.textContent = 'Loading…';
+            searchMoreTracks(q, allTracks.length).then(function(more){
+              if (searchInput.value.trim() !== q) return;
+              var from = allTracks.length;
+              allTracks = allTracks.concat(more);
+              addTracks(more, from);
+              if (more.length < 10) moreBtn.remove();
+              else { moreBtn.disabled = false; moreBtn.textContent = 'More songs'; }
+              renderLibraryPlayingState();
+            }).catch(function(err){ moreBtn.disabled = false; moreBtn.textContent = 'More songs'; showToast(friendlySpotifyError(err)); });
+          });
+        }
+        if (res.artists.length){
+          searchResults.appendChild(sectionTitle('Artists'));
+          res.artists.forEach(function(a){ searchResults.appendChild(contextRow(firstImage(a), a.name, 'Artist', a.uri, true)); });
+        }
+        if (res.albums.length){
+          searchResults.appendChild(sectionTitle('Albums'));
+          res.albums.forEach(function(al){
+            var by = (al.artists || []).map(function(x){ return x.name; }).join(', ');
+            var year = (al.release_date || '').slice(0, 4);
+            searchResults.appendChild(contextRow(firstImage(al), al.name, by + (year ? ' · ' + year : ''), al.uri, false));
+          });
+        }
+        if (res.playlists.length){
+          searchResults.appendChild(sectionTitle('Playlists'));
+          res.playlists.forEach(function(pl){
+            var owner = pl.owner && pl.owner.display_name ? 'by ' + pl.owner.display_name : 'Playlist';
+            searchResults.appendChild(contextRow(firstImage(pl), pl.name, owner, pl.uri, false));
+          });
+        }
         renderLibraryPlayingState();
+      }).catch(function(err){
+        if (searchInput.value.trim() !== q) return;
+        searchResults.innerHTML = '';
+        var e = document.createElement('div');
+        e.className = 'search-empty';
+        e.textContent = friendlySpotifyError(err) || 'Search failed.';
+        searchResults.appendChild(e);
       });
       return;
     }
@@ -1882,6 +2007,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }));
     });
   }
+  // While the search box has focus, Space and the arrow keys are for typing
+  // and moving the cursor, so the playback shortcuts (handled in main.js) are
+  // switched off; they come back as soon as the box loses focus.
+  function setShortcuts(on){
+    if (window.simplePlayer && window.simplePlayer.setPlaybackShortcutsEnabled) window.simplePlayer.setPlaybackShortcutsEnabled(on);
+  }
+  searchInput.addEventListener('focus', function(){ setShortcuts(false); });
+  searchInput.addEventListener('blur', function(){ setShortcuts(true); });
   searchInput.addEventListener('input', function(){
     var q = searchInput.value.trim();
     if (useRealPlayback){
@@ -1911,7 +2044,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // own backend has actually caught up (a real, observed propagation gap).
   var lastShuffleChangeAt = 0;
   var lastRepeatChangeAt = 0;
-  var REAL_STATE_GRACE_MS = 3000;
+  var REAL_STATE_GRACE_MS = 5000; // after pressing shuffle/repeat, ignore polls this long (Spotify can lag)
   var realProgressTimer = null;
   var pollTimer = null;
   var playlistNameCache = {};
@@ -1943,8 +2076,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       err.reason = reason;
       throw err;
     }
+    // Spotify answers some commands (next, previous, shuffle, repeat...) with
+    // a 200 and an empty or non-JSON body. The command HAS succeeded then, so
+    // a body that doesn't parse must never be reported as an error (that used
+    // to show "Could not reach Spotify" even though the action worked, and
+    // made the shuffle/repeat buttons flip back).
     var text = await res.text();
-    return text ? JSON.parse(text) : null;
+    if (!text) return null;
+    try { return JSON.parse(text); } catch (parseErr) { return null; }
   }
 
   // Re-reads the connected/not-connected status from main.js and updates
@@ -2066,12 +2205,62 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // playlist menu, so each only hits the Spotify API once per session
   // (or once per explicit refresh) rather than duplicating requests.
   var realPlaylistsCache = null;
+  // Your playlists, all pages. Tries a page size of 50 and falls back to
+  // smaller ones if Spotify refuses it. Throws on a real failure (the add
+  // menu then shows the reason instead of an empty list).
+  // Spotify's own app lists playlists by "Recents". The Web API doesn't
+  // expose that order, so Simple Player approximates it: playlists you
+  // played here come first, most recent first; the rest keep the order
+  // Spotify's API returns (the order of your library).
+  var RECENCY_KEY = 'simplePlayer.playlistRecency';
+  function loadRecency(){
+    try { return JSON.parse(localStorage.getItem(RECENCY_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  function notePlaylistPlayed(uri){
+    if (!uri || !/^spotify:playlist:/.test(uri)) return;
+    var r = loadRecency();
+    r[uri] = Date.now();
+    var keys = Object.keys(r);
+    if (keys.length > 100) { keys.sort(function(a, b){ return r[a] - r[b]; }); delete r[keys[0]]; }
+    try { localStorage.setItem(RECENCY_KEY, JSON.stringify(r)); } catch (e) {}
+  }
+  function sortPlaylistsLikeRecents(pls){
+    var r = loadRecency();
+    var played = pls.filter(function(p){ return r[p.uri]; }).sort(function(a, b){ return r[b.uri] - r[a.uri]; });
+    var rest = pls.filter(function(p){ return !r[p.uri]; });
+    return played.concat(rest);
+  }
+  var realMeId = null;
   function fetchRealPlaylists(force){
     if (realPlaylistsCache && !force) return Promise.resolve(realPlaylistsCache);
-    return spotifyApi('/me/playlists?limit=50').then(function(r){
-      realPlaylistsCache = (r && r.items) ? r.items.filter(Boolean) : [];
-      return realPlaylistsCache;
-    }).catch(function(){ return realPlaylistsCache || []; });
+    function page(size, offset){
+      return spotifyApi('/me/playlists?limit=' + size + '&offset=' + offset);
+    }
+    function loadAll(size){
+      var all = [];
+      function next(offset){
+        return page(size, offset).then(function(r){
+          var items = (r && r.items) ? r.items.filter(Boolean) : [];
+          all = all.concat(items);
+          if (r && r.next && items.length && offset < 400) return next(offset + size);
+          return all;
+        });
+      }
+      return next(0);
+    }
+    return loadAll(50).catch(function(err){
+      if (err && err.status === 400) return loadAll(10); // page size refused
+      throw err;
+    }).then(function(all){
+      // Only playlists you can actually add to: yours, or collaborative ones.
+      var mePromise = realMeId ? Promise.resolve(realMeId)
+        : spotifyApi('/me').then(function(me){ realMeId = me && me.id; return realMeId; }).catch(function(){ return null; });
+      return mePromise.then(function(meId){
+        var mine = meId ? all.filter(function(pl){ return pl.collaborative || (pl.owner && pl.owner.id === meId); }) : all;
+        realPlaylistsCache = mine.length ? mine : all;
+        return realPlaylistsCache;
+      });
+    });
   }
 
   var realLikedCache = null;
@@ -2098,11 +2287,47 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }).catch(function(){ return realLikedCache || []; });
   }
 
-  function searchRealTracks(q){
-    if (!q) return Promise.resolve([]);
-    return spotifyApi('/search?type=track&limit=20&q=' + encodeURIComponent(q)).then(function(r){
+  // Searches Spotify's whole catalogue (not just your library): songs,
+  // artists, albums and playlists. 10 per type is the most the Web API
+  // reliably accepts for this app; "More songs" pages through further songs.
+  // If the multi-type request is refused, falls back to songs only.
+  function searchRealAll(q){
+    var enc = encodeURIComponent(q);
+    return spotifyApi('/search?type=track,artist,album,playlist&limit=10&q=' + enc).catch(function(err){
+      if (err && err.status === 400) return spotifyApi('/search?type=track&limit=10&q=' + enc);
+      throw err;
+    }).then(function(r){
+      function items(x){ return (x && x.items) ? x.items.filter(Boolean) : []; }
+      r = r || {};
+      return { tracks: items(r.tracks), artists: items(r.artists), albums: items(r.albums), playlists: items(r.playlists) };
+    });
+  }
+  function searchMoreTracks(q, offset){
+    return spotifyApi('/search?type=track&limit=10&offset=' + offset + '&q=' + encodeURIComponent(q)).then(function(r){
       return (r && r.tracks && r.tracks.items) ? r.tracks.items.filter(Boolean) : [];
-    }).catch(function(){ return []; });
+    });
+  }
+  function firstImage(o){ return (o && o.images && o.images[0]) ? o.images[0].url : ''; }
+
+  // A result row for something that is played as a whole (artist, album, playlist).
+  function contextRow(imgUrl, title, subtitle, uri, round){
+    var row = document.createElement('div');
+    row.className = 'track-row ctx';
+    row.innerHTML = '<div class="thumb' + (round ? ' round' : '') + '" style="background-image:' + cssUrl(imgUrl) + ';background-color:var(--bg-elev-2);"></div>' +
+      '<div class="meta"><div class="ttl"></div><div class="sub"></div></div>';
+    row.querySelector('.ttl').textContent = title;
+    row.querySelector('.sub').textContent = subtitle;
+    row.addEventListener('click', function(){
+      playRealContext(uri);
+      goToPlayerTab();
+    });
+    return row;
+  }
+  function sectionTitle(text){
+    var h = document.createElement('div');
+    h.className = 'search-section';
+    h.textContent = text;
+    return h;
   }
 
   // Starts real playback at a specific track, either as a flat list of
@@ -2167,11 +2392,36 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var keys = Object.keys(preloaded);
     if (keys.length > 40) delete preloaded[keys[0]];
   }
-  function rememberInHistory(t){
-    trackHistory.push(t);
-    if (trackHistory.length > 20) trackHistory.shift();
-    preloadCover(t);
+  // Slim copy of a Spotify track, small enough to keep between sessions.
+  function slimTrack(t){
+    var img = coverUrl(t);
+    return {
+      id: t.id, uri: t.uri, name: t.name, duration_ms: t.duration_ms,
+      artists: (t.artists || []).map(function(a){ return { name: a.name }; }),
+      album: { images: img ? [{ url: img }] : [] }
+    };
   }
+  var HISTORY_KEY = 'simplePlayer.history';
+  function saveHistory(){
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(trackHistory)); } catch (e) {}
+  }
+  function rememberInHistory(t){
+    var slim = slimTrack(t);
+    var last = trackHistory[trackHistory.length - 1];
+    if (!last || last.id !== slim.id) trackHistory.push(slim);
+    if (trackHistory.length > 20) trackHistory.shift();
+    preloadCover(slim);
+    saveHistory();
+  }
+  // Tracks played in earlier sessions: so "previous" has a cover to show
+  // right away even just after the app was reopened.
+  try {
+    var savedHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    if (Array.isArray(savedHistory)) {
+      trackHistory = savedHistory.filter(function(t){ return t && t.id && t.uri; }).slice(-20);
+      trackHistory.slice(-3).forEach(preloadCover);
+    }
+  } catch (e) {}
   function showRealTrackDisplay(t){
     currentRealItem = t;
     lastKnownTrackId = t.id;
@@ -2314,6 +2564,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     realPlaybackMeta.trackId = t.id;
     realPlaybackMeta.trackUri = t.uri;
     realPlaybackMeta.contextUri = s.context && s.context.uri;
+    if (isNewTrack) notePlaylistPlayed(realPlaybackMeta.contextUri);
     state.elapsed = s.progress_ms / 1000;
     state.playing = !!s.is_playing;
     setPlayIcon(state.playing);
@@ -2423,9 +2674,44 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }).catch(function(){ /* worst case: the first Play press does the same job */ });
   }
 
+  // ---------------- Volume: Windows master volume ----------------
+  // On Windows the bars set the computer's own volume (so they control what
+  // you actually hear, whichever app plays). Outside Windows / in a preview
+  // they fall back to Spotify's volume for the active device. Requests are
+  // throttled so dragging doesn't flood the helper / Spotify's API.
+  var windowsVolume = false;
+  var lastVolumeSentAt = 0, volumeTimer = null, volumeTouchedAt = 0;
+
+  function sendVolume(vol){
+    lastVolumeSentAt = Date.now();
+    if (windowsVolume) window.simplePlayer.volumeSet(Math.round(vol));
+    else if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
+  }
   onVolumeChange = function(vol){
-    if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
+    volumeTouchedAt = Date.now();
+    var wait = (windowsVolume ? 40 : 300) - (Date.now() - lastVolumeSentAt);
+    if (wait <= 0) { sendVolume(vol); return; }
+    clearTimeout(volumeTimer);
+    volumeTimer = setTimeout(function(){ sendVolume(state.volume); }, wait); // always ends on the final value
   };
+
+  // Keep the bar in sync with the real Windows volume (changed by keyboard,
+  // the taskbar, etc.), but never while the user is touching it.
+  function syncWindowsVolume(){
+    if (!windowsVolume || document.hidden || Date.now() - volumeTouchedAt < 2500) return;
+    window.simplePlayer.volumeGet().then(function(v){
+      if (v === null || Date.now() - volumeTouchedAt < 2500) return;
+      if (Math.round(state.volume) !== v) { state.volume = v; if (updateVolumeDisplay) updateVolumeDisplay(); }
+    });
+  }
+  if (window.simplePlayer && window.simplePlayer.volumeIsSupported) {
+    window.simplePlayer.volumeIsSupported().then(function(ok){
+      if (!ok) return;
+      windowsVolume = true;
+      syncWindowsVolume();
+      setInterval(syncWindowsVolume, 3000);
+    });
+  }
 
   if (window.simplePlayer && window.simplePlayer.spotifyGetStatus) {
     window.simplePlayer.spotifyGetStatus().then(function(connected){

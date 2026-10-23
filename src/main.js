@@ -73,6 +73,14 @@ function setZoomFactor(factor) {
   return clamped;
 }
 
+// False while the user is typing in a text field (the search box): then
+// Space and the arrow keys must reach the field, not control playback.
+let playbackShortcutsEnabled = true;
+ipcMain.handle('shortcuts:set-enabled', (event, enabled) => {
+  playbackShortcutsEnabled = !!enabled;
+  return playbackShortcutsEnabled;
+});
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -219,6 +227,7 @@ function createWindow() {
       event.preventDefault();
       return;
     }
+    if (!playbackShortcutsEnabled) return; // typing: let Space / arrows through to the text field
     if (input.key === ' ') {
       mainWindow.webContents.send('shortcut:toggle-play');
       event.preventDefault();
@@ -409,6 +418,117 @@ ipcMain.handle('window:restore-saved-position', () => {
   return true;
 });
 
+
+// --- Windows master volume -------------------------------------------------
+// The volume bars control the computer's own (Windows) volume, not just
+// Spotify's. Electron has no API for that, so a small PowerShell helper stays
+// running in the background and talks to the Windows Core Audio API; commands
+// are sent to it as text lines ("get" / "set 45"). Started on first use,
+// stopped when the app quits. Windows only; elsewhere the renderer falls back
+// to Spotify's own volume.
+const VOLUME_PS_SCRIPT = `
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+  int f(); int g(); int h(); int i();
+  int SetMasterVolumeLevelScalar(float fLevel, Guid pguidEventContext);
+  int j();
+  int GetMasterVolumeLevelScalar(out float pfLevel);
+  int k(); int l(); int m(); int n();
+  int SetMute([MarshalAs(UnmanagedType.Bool)] bool bMute, Guid pguidEventContext);
+  int GetMute(out bool pbMute);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice { int Activate(ref Guid id, int clsCtx, int activationParams, out IAudioEndpointVolume aev); }
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator { int f(); int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice endpoint); }
+[ComImport, Guid("BCDE0395-E52F-49B1-8B6B-A0C0AF5C1B5F")] class MMDeviceEnumeratorComObject { }
+public class SPAudio {
+  static IAudioEndpointVolume Vol() {
+    var enumerator = new MMDeviceEnumeratorComObject() as IMMDeviceEnumerator;
+    IMMDevice dev = null;
+    Marshal.ThrowExceptionForHR(enumerator.GetDefaultAudioEndpoint(0, 1, out dev));
+    IAudioEndpointVolume epv = null;
+    var epvid = typeof(IAudioEndpointVolume).GUID;
+    Marshal.ThrowExceptionForHR(dev.Activate(ref epvid, 23, 0, out epv));
+    return epv;
+  }
+  public static int Get() { float v = -1; Marshal.ThrowExceptionForHR(Vol().GetMasterVolumeLevelScalar(out v)); return (int)Math.Round(v * 100); }
+  public static void Set(int percent) {
+    var e = Vol();
+    e.SetMasterVolumeLevelScalar(percent / 100f, Guid.Empty);
+    if (percent > 0) e.SetMute(false, Guid.Empty);
+  }
+}
+'@
+[Console]::Out.WriteLine('READY')
+while (($line = [Console]::In.ReadLine()) -ne $null) {
+  try {
+    if ($line -eq 'get') { [Console]::Out.WriteLine('V ' + [SPAudio]::Get()) }
+    elseif ($line -like 'set *') { [SPAudio]::Set([int]$line.Substring(4)) }
+  } catch { [Console]::Out.WriteLine('E ' + $_.Exception.Message) }
+}
+`;
+
+let volHelper = null;
+let volGetWaiters = []; // resolvers waiting for the next "V n" line
+
+function startVolumeHelper() {
+  if (volHelper || process.platform !== 'win32') return volHelper;
+  const encoded = Buffer.from(VOLUME_PS_SCRIPT, 'utf16le').toString('base64');
+  const child = spawn('powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
+    { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+  let buffer = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    buffer += chunk;
+    let nl;
+    while ((nl = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line.startsWith('V ')) {
+        const waiter = volGetWaiters.shift();
+        if (waiter) waiter(parseInt(line.slice(2), 10));
+      } else if (line.startsWith('E ')) {
+        const waiter = volGetWaiters.shift();
+        if (waiter) waiter(null);
+      }
+    }
+  });
+  child.stdin.on('error', () => {});
+  child.on('error', () => { volHelper = null; });
+  child.on('exit', () => {
+    volHelper = null;
+    volGetWaiters.splice(0).forEach((w) => w(null));
+  });
+  volHelper = child;
+  return child;
+}
+
+function stopVolumeHelper() {
+  if (volHelper) { try { volHelper.kill(); } catch (err) {} volHelper = null; }
+}
+
+ipcMain.handle('volume:is-supported', () => process.platform === 'win32');
+ipcMain.handle('volume:get', () => new Promise((resolve) => {
+  const h = startVolumeHelper();
+  if (!h) return resolve(null);
+  const timer = setTimeout(() => resolve(null), 8000); // first call compiles the helper: allow time
+  volGetWaiters.push((v) => { clearTimeout(timer); resolve(Number.isFinite(v) ? v : null); });
+  h.stdin.write('get\n');
+}));
+ipcMain.handle('volume:set', (event, percent) => {
+  const n = Math.round(Number(percent));
+  if (!Number.isFinite(n)) return false;
+  const h = startVolumeHelper();
+  if (!h) return false;
+  h.stdin.write('set ' + Math.min(100, Math.max(0, n)) + '\n');
+  return true;
+});
+
 ipcMain.handle('display:get-zoom-factor', () => store.get('zoomFactor'));
 ipcMain.handle('display:set-zoom-factor', (event, factor) => setZoomFactor(factor));
 
@@ -508,6 +628,7 @@ app.on('before-quit', () => {
   // session — never one the user already had open before starting Simple
   // Player.
   killGhostSpotifyIfAny();
+  stopVolumeHelper();
 });
 
 // Intentionally no 'window-all-closed' handler: registering one (even an
