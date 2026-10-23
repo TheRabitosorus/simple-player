@@ -113,8 +113,23 @@ async function getValidAccessToken() {
     return cachedAccessToken;
   }
   const refreshToken = loadRefreshToken();
-  if (!refreshToken) throw new Error('Not connected to Spotify');
-  const tokens = await refreshAccessToken(refreshToken);
+  if (!refreshToken) throw new Error('REAUTH_REQUIRED: not connected');
+  let tokens;
+  try {
+    tokens = await refreshAccessToken(refreshToken);
+  } catch (err) {
+    // The stored refresh token is no longer valid (revoked, expired, or a
+    // leftover from before the storage-location fix in v1.9.2). Clear it
+    // so isConnected() stops claiming we're connected when every real API
+    // call would actually fail — that mismatch is what caused every
+    // action to show a vague "Could not reach Spotify" even while the
+    // app displayed "Connected". Marking the error REAUTH_REQUIRED lets
+    // the renderer show a precise "reconnect to Spotify" message instead.
+    clearStoredAuth();
+    cachedAccessToken = null;
+    cachedAccessTokenExpiry = 0;
+    throw new Error('REAUTH_REQUIRED: ' + err.message);
+  }
   cachedAccessToken = tokens.access_token;
   cachedAccessTokenExpiry = now + tokens.expires_in * 1000;
   if (tokens.refresh_token) saveRefreshToken(tokens.refresh_token); // Spotify may rotate it

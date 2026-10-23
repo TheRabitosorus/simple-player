@@ -106,8 +106,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #swipeZone{padding-right:20px;}
 /* While the user is actively dragging up/down on the cover art to change
    the volume in idle mode, the rail becomes visible again as feedback
-   (level + direction), then fades back out once the gesture ends. */
+   (level + direction), then fades back out once the gesture ends. The
+   swipe zone's right padding has to come back too while this is
+   happening — otherwise the (much larger, idle-sized) cover art keeps
+   using the space the rail needs and crowds it out visually. */
 #app.idle.volume-dragging #volumeRail{opacity:1;pointer-events:none;transition:opacity .12s ease;}
+#app.idle.volume-dragging #swipeZone{padding-right:calc(var(--rail-w) + 12px);transition:padding-right .12s ease;}
 #art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
@@ -738,7 +742,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   // ---------------- Réglages ----------------
   var settings = {
-    idleDelay: 3000,
+    idleDelay: 5000,
     volZone: 'normal',
     bgEnabled: true,
     startup: false
@@ -1086,7 +1090,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       if (locked === null){
         if (Math.abs(dx) > 6 || Math.abs(dy) > 6){
           locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-          if (locked === 'y') document.getElementById('app').classList.add('volume-dragging');
+          if (locked === 'y') {
+            document.getElementById('app').classList.add('volume-dragging');
+            // The CSS above frees up room for the rail again (idle mode
+            // normally lets the cover art use that space) — resize the
+            // art to that narrower width now, instead of only on the
+            // next unrelated resize/idle event.
+            fitArtSquare();
+          }
         }
       }
       if (locked === 'y'){
@@ -1139,7 +1150,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       if (locked === 'y'){
         // Leave the volume feedback on screen for a beat so the final
         // level is actually visible, then fade it back out.
-        setTimeout(function(){ document.getElementById('app').classList.remove('volume-dragging'); }, 700);
+        setTimeout(function(){
+          document.getElementById('app').classList.remove('volume-dragging');
+          fitArtSquare();
+        }, 700);
       }
       if (locked === 'x'){
         var dx = e.clientX - startX;
@@ -1164,7 +1178,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     zone.addEventListener('pointerdown', onDown);
     zone.addEventListener('pointermove', onMove);
     zone.addEventListener('pointerup', onUp);
-    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; snapBack(); document.getElementById('app').classList.remove('volume-dragging'); } });
+    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; snapBack(); document.getElementById('app').classList.remove('volume-dragging'); fitArtSquare(); } });
   })();
 
   // ---------------- Volume rail ----------------
@@ -1773,7 +1787,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   async function spotifyApi(path, options){
     options = options || {};
-    var token = await window.simplePlayer.spotifyGetAccessToken();
+    var token;
+    try {
+      token = await window.simplePlayer.spotifyGetAccessToken();
+    } catch (tokenErr) {
+      // main.js/spotifyAuth.js marks this with REAUTH_REQUIRED when the
+      // stored token is no longer valid and has just been cleared — tag
+      // it here so friendlySpotifyError() can tell the user precisely
+      // what's wrong instead of the generic "Could not reach Spotify".
+      var authErr = new Error((tokenErr && tokenErr.message) || 'Spotify auth error');
+      authErr.reauthRequired = /REAUTH_REQUIRED/.test(authErr.message);
+      refreshSpotifyConnectedBadge();
+      throw authErr;
+    }
     var res = await fetch('https://api.spotify.com/v1' + path, Object.assign({}, options, {
       headers: Object.assign({ 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, options.headers || {})
     }));
@@ -1790,6 +1816,22 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     return text ? JSON.parse(text) : null;
   }
 
+  // Re-reads the connected/not-connected status from main.js and updates
+  // the Settings badge. Used after a token refresh fails and the stored
+  // auth gets cleared, so the UI stops claiming "Connected" once it no
+  // longer actually is.
+  function refreshSpotifyConnectedBadge(){
+    if (!window.simplePlayer || !window.simplePlayer.spotifyGetStatus) return;
+    window.simplePlayer.spotifyGetStatus().then(function(connected){
+      var statusEl = document.getElementById('accountStatus');
+      var link = document.getElementById('connectSpotifyBtn');
+      if (!statusEl || !link) return;
+      statusEl.classList.toggle('connected', connected);
+      statusEl.innerHTML = '<span class="status-dot"></span>' + (connected ? 'Connected' : 'Not connected');
+      link.textContent = connected ? 'Disconnect' : 'Connect to Spotify';
+    });
+  }
+
   // Turns a spotifyApi() error into a message the user can actually act
   // on. "No active device" is by far the most common real-world cause of
   // "nothing happens" — Simple Player is a remote control, so something
@@ -1799,6 +1841,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // hidden Spotify on this computer instead of just telling the user to
   // do it themselves. (ghostSettings is declared near the top of this file.)
   function friendlySpotifyError(err){
+    if (err && err.reauthRequired) {
+      return 'Your Spotify connection expired — go to Settings and reconnect.';
+    }
     if (err && (err.reason === 'NO_ACTIVE_DEVICE' || err.status === 404)) {
       if (ghostSettings.enabled && window.simplePlayer.ghostNoActiveDevice) {
         window.simplePlayer.ghostNoActiveDevice();

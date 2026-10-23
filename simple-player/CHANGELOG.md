@@ -2,6 +2,12 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.10.1 — 23 octobre 2026
+
+- **Trouvé et corrigé : "Could not reach Spotify" partout, et rien ne joue, même connecté.** La vraie cause : l'app vérifiait seulement si un jeton de connexion *existait*, jamais s'il était encore valide. Si ce jeton était mort (révoqué, ou un reliquat de l'ancien dossier de stockage d'avant le correctif v1.9.2), l'app continuait d'afficher "Connecté" alors qu'aucun appel à Spotify ne pouvait réellement passer. Maintenant, si ça arrive, l'app efface ce jeton mort, affiche "Not connected" dans Settings, et te dit clairement d'aller te reconnecter — au lieu du message vague d'avant. **Si tu vois encore "Could not reach Spotify" après cette mise à jour : va dans Settings et reconnecte-toi à Spotify.** Si le problème persiste même après une reconnexion fraîche, dis-le-moi, ce serait autre chose.
+- **Barre de volume invisible en idle, corrigé.** En mode immersif (idle), la pochette d'album récupère l'espace normalement réservé à la barre de volume (puisqu'elle est censée être cachée). Mais quand tu glissais le doigt pour ajuster le son, cet espace n'était jamais restitué à la barre, qui redevenait donc techniquement visible mais écrasée par la pochette, désormais énorme. C'est corrigé : l'espace est maintenant restitué pendant que tu glisses, pochette comprise.
+- Immersive mode : délai par défaut avant l'effacement de l'interface passé de 3 à 5 secondes.
+
 ## v1.10.0 — 23 octobre 2026
 
 **Nouveau réglage : "Ghost Spotify"** (désactivé par défaut, dans Settings). Une fois activé : quand Simple Player détecte qu'aucun appareil Spotify n'est actif nulle part (au lancement, et chaque fois qu'une commande échoue avec "no active device"), il lance automatiquement le **vrai client Spotify officiel** installé sur ton ordinateur, en arrière-plan, et tente de le masquer de la barre des tâches. Quand tu fermes Simple Player, ce Spotify "fantôme" se ferme avec lui — mais seulement celui que Simple Player a lui-même lancé ; si tu avais déjà Spotify ouvert avant, il n'y touche pas.
