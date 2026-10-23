@@ -77,4 +77,4 @@ npm run dist
 - ✅ Connexion réelle à Spotify (OAuth) — bouton "Connect to Spotify" fonctionnel dans les réglages
 - ✅ Zoom de l'interface : Ctrl + molette, Ctrl +/-/0, ou un réglage dans les Settings
 - ✅ Lecture réelle de musique via Spotify (Web Playback SDK) : play/pause/suivant/précédent/volume/shuffle/repeat/progression/pochette réelle, synchronisé avec l'état réel de Spotify (fonctionne même si tu changes de piste depuis ton téléphone)
-- ⏳ Bibliothèque et recherche branchées sur ton vrai compte Spotify — actuellement encore des données fictives de démonstration
+- ✅ Bibliothèque (Liked Songs + tes vraies playlists) et recherche branchées sur ton vrai compte Spotify

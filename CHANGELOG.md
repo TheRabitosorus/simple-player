@@ -2,6 +2,38 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.7.0 — 22 octobre 2026
+
+**La Bibliothèque et la Recherche sont maintenant réelles** — c'était le dernier gros morceau marqué comme fictif dans le projet.
+
+- L'onglet **Library** affiche tes vraies Liked Songs (jusqu'à 100) et tes vraies playlists, avec leurs vraies pochettes.
+- Cliquer sur une chanson de Liked Songs la joue réellement sur ton appareil actif ; cliquer sur une playlist la lance réellement.
+- L'onglet **Search** interroge maintenant vraiment Spotify pendant que tu tapes, et cliquer sur un résultat le joue réellement.
+- La chanson actuellement en train de jouer est maintenant surlignée dans la Bibliothèque et la Recherche, basé sur son vrai identifiant (pas son titre — plus fiable si deux chansons ont le même nom).
+- Tant que tu n'es pas connecté à Spotify, Library/Search affichent encore les données fictives de démonstration comme avant (utile pour essayer l'interface sans compte).
+
+**Limite à savoir** : comme toujours avec Simple Player (une télécommande, pas le lecteur lui-même), ça suppose qu'un appareil Spotify est déjà actif quelque part (téléphone, ordi, enceinte) — sinon Spotify n'a rien à qui envoyer l'ordre de lecture.
+
+## v1.6.0 — 22 octobre 2026
+
+**Important : reconnexion Spotify requise.** Ajouter une chanson à une vraie playlist demande une permission Spotify que l'app ne demandait pas encore. Va dans **Settings → Spotify Account → Disconnect, puis Connect to Spotify à nouveau** et accepte les permissions — sinon tu auras un message "Reconnect Spotify in Settings" en essayant d'ajouter à une playlist.
+
+- Le bouton "+" affiche maintenant tes **vraies playlists Spotify** (plus des données fictives), et y ajouter une chanson l'ajoute **réellement** sur ton compte.
+- Quand une chanson est ajoutée à une playlist (ou à Liked Songs), la petite tique verte en haut devient verte pour le confirmer. **Limite à savoir** : comme Spotify n'offre pas de façon simple de vérifier "cette chanson est-elle déjà dans une de mes playlists", la tique ne reflète que les ajouts faits depuis Simple Player pendant la session en cours — pas les chansons déjà présentes dans tes playlists avant.
+- Correction : en mode idle, la pochette était décalée vers la gauche (l'espace réservé pour le rail de volume à droite restait en place même si le rail devenait invisible). Elle est maintenant bien centrée.
+
+## v1.5.0 — 21 octobre 2026
+
+**Corrections suite à tes tests sur la v1.4.0** :
+
+- **Important, barre du bas** : le geste pour faire réapparaître la barre Player/Library/Search/Settings était trop difficile à déclencher et pouvait te laisser sans accès aux réglages. La zone au bas de l'écran est maintenant beaucoup plus grande, marquée par une petite poignée visible, et **un simple tap sur cette zone fonctionne aussi** (en plus du glisser vers le haut) — donc il y a toujours un moyen garanti d'y revenir.
+- **Pochette carrée** : le système précédent (basé sur les pourcentages d'écran) ne donnait pas toujours un carré parfait, surtout en mode idle. Remplacé par un calcul qui mesure l'espace réellement disponible à chaque instant (redimensionnement, changement de zoom, bascule idle) et force toujours la même valeur en largeur et en hauteur — donc un carré garanti, peu importe le zoom ou la taille de fenêtre.
+- **Barre noire en haut en mode idle** : la zone du titre (en haut) restait réservée, même invisible, en mode idle. Elle se referme maintenant complètement, comme la barre du bas, et le lecteur utilise toute la fenêtre.
+- Le symbole pause reste maintenant affiché sur la pochette tant que la musique est en pause (avant, il ne s'affichait qu'en touchant/pressant l'écran).
+- En glissant vers le haut/bas sur la pochette en mode idle pour ajuster le volume, le repère de volume redevient visible pendant le geste, pour voir le niveau et la direction.
+- Shuffle et Repeat s'allument maintenant en **vert plein** (comme le bouton Play) au lieu d'un vert pâle à peine visible.
+- La zone tactile du réglage de volume (le petit rail à droite) est maintenant beaucoup plus large qu'avant, sans changer son apparence — pour éviter de la rater du doigt.
+
 ## v1.4.0 — 21 octobre 2026
 
 **Correction de bug important** : à un zoom élevé, la pochette (dimensionnée en pourcentages de l'écran) ne tenait plus compte de l'espace réellement disponible et débordait par-dessus les boutons et la barre du bas — exactement ce que montraient tes captures. Corrigé en profondeur : la pochette s'ajuste maintenant toujours à l'espace réellement libre, peu importe le niveau de zoom ou la taille de la fenêtre.

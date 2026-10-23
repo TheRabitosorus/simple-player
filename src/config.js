@@ -21,6 +21,8 @@ module.exports = {
     'user-library-read',
     'user-library-modify',
     'playlist-read-private',
-    'playlist-read-collaborative'
+    'playlist-read-collaborative',
+    'playlist-modify-public',
+    'playlist-modify-private'
   ].join(' ')
 };
