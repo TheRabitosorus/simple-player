@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.10.2 — 23 octobre 2026
+
+- **Trouvé la vraie cause de la barre de volume invisible — spécifique au tactile.** `touch-action:pan-y` était posé sur la zone de swipe, ce qui dit explicitement à Chromium (le moteur derrière Electron) de prendre lui-même en charge le geste vertical, comme un scroll natif. Sur tactile, ça annulait notre propre geste (volume) en plein milieu, avant que la barre ait eu le temps de s'afficher — alors qu'à la souris, cette propriété n'a aucun effet, donc ça marchait très bien (ce qui m'a mis sur la piste). Remplacé par `touch-action:none`, puisqu'on gère déjà nous-mêmes les deux axes (horizontal = changer de piste, vertical = volume). Merci d'avoir précisé que ça marchait à la souris — sans ce détail, je n'aurais pas trouvé celle-là.
+
 ## v1.10.1 — 23 octobre 2026
 
 - **Trouvé et corrigé : "Could not reach Spotify" partout, et rien ne joue, même connecté.** La vraie cause : l'app vérifiait seulement si un jeton de connexion *existait*, jamais s'il était encore valide. Si ce jeton était mort (révoqué, ou un reliquat de l'ancien dossier de stockage d'avant le correctif v1.9.2), l'app continuait d'afficher "Connecté" alors qu'aucun appel à Spotify ne pouvait réellement passer. Maintenant, si ça arrive, l'app efface ce jeton mort, affiche "Not connected" dans Settings, et te dit clairement d'aller te reconnecter — au lieu du message vague d'avant. **Si tu vois encore "Could not reach Spotify" après cette mise à jour : va dans Settings et reconnecte-toi à Spotify.** Si le problème persiste même après une reconnexion fraîche, dis-le-moi, ce serait autre chose.
