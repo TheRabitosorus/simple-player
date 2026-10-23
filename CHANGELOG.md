@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.15.0 — 23 octobre 2026
+
+- **La musique joue sur TON ORDINATEUR, pas sur le téléphone.** Avant, Ghost Spotify ne démarrait Spotify que s'il n'y avait *aucun* appareil actif — donc si le téléphone était actif, rien ne se passait côté PC. Maintenant, avec Ghost Spotify activé :
+  - l'app cherche l'appareil Spotify de cet ordinateur (Spotify le nomme d'après le nom de l'ordinateur Windows) et démarre Spotify masqué s'il n'est pas là (sans en relancer un second si le tien est déjà ouvert) ;
+  - chaque Play est envoyé explicitement à cet appareil, ce qui rapatrie aussi la lecture depuis le téléphone ;
+  - à la connexion, si la lecture est sur un autre appareil, elle est ramenée ici (en pause).
+  Si Spotify ne se montre pas en 25 s, un message clair l'indique.
+- **Messages d'erreur plus précis.** « Could not reach Spotify » ne s'affiche plus que pour une vraie coupure réseau ; sinon tu vois le code d'erreur Spotify (ex. « Spotify error 500 »), ou « Spotify is busy » en cas de limite de requêtes. Si une erreur persiste, dis-moi exactement le message.
+- **Pochettes instantanées au swipe.** Les 3 prochaines pochettes (file d'attente Spotify) sont téléchargées d'avance, et les précédentes sont gardées en mémoire : au swipe, la nouvelle pochette et le nouveau titre s'affichent tout de suite, puis Spotify confirme. Les réponses de Spotify qui montrent encore l'ancienne piste juste après un swipe sont ignorées pour éviter un retour en arrière visuel.
+
 ## v1.14.3 — 23 octobre 2026
 
 - **Ghost Spotify est maintenant activé par défaut.** Si tu l'avais laissé sur Off dans une ancienne version, il est passé sur On une seule fois au premier lancement de cette version; ensuite ton choix est toujours respecté. Au lancement (ou quand tu appuies sur Play), si aucun appareil Spotify n'est actif, il démarre Spotify masqué sur ton ordinateur — sans lancer de musique — et le ferme avec Simple Player.

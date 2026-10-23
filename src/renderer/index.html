@@ -578,7 +578,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Settings for "Ghost Spotify" (see Settings tab + friendlySpotifyError
   // below). Declared early since the Settings-tab wiring reads it before
   // the real-playback code further down the file would otherwise set it.
-  var ghostSettings = { enabled: false, exePath: null, platformSupported: false };
+  var ghostSettings = { enabled: false, exePath: null, platformSupported: false, computerName: '' };
+  var ghostLoaded = false; // true once main.js has answered ghost:get-settings
 
   // ---------------- Data (fictif, pour la démo) ----------------
   var CATALOG = [
@@ -908,7 +909,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // to 2 seconds. The next poll still confirms/corrects it either way.
       state.playing = true;
       setPlayIcon(true);
-      spotifyApi('/me/player/play', { method: 'PUT' }).catch(function(err){
+      playPath().then(function(path){ return spotifyApi(path, { method: 'PUT' }); }).catch(function(err){
         state.playing = false;
         setPlayIcon(false);
         showToast(friendlySpotifyError(err));
@@ -973,7 +974,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function next(auto, skipShake){
-    if (useRealPlayback){ spotifyApi('/me/player/next', { method: 'POST' }).then(pollPlaybackState).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
+    if (useRealPlayback){
+      optimisticSwitch(queueItems.shift());
+      spotifyApi('/me/player/next', { method: 'POST' }).then(pollSoon).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
     state.index = pickNextIndex();
     renderTrack();
     if (!auto && !skipShake){
@@ -984,7 +987,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     renderLibraryPlayingState();
   }
   function prev(skipShake){
-    if (useRealPlayback){ spotifyApi('/me/player/previous', { method: 'POST' }).then(pollPlaybackState).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
+    if (useRealPlayback){
+      // Spotify restarts the current track instead of going back when more
+      // than ~3 s have played; only swap the cover when it will really go back.
+      if (state.elapsed < 3 && trackHistory.length) {
+        lastOptimisticAt = Date.now();
+        var back = trackHistory.pop();
+        if (currentRealItem) queueItems.unshift(currentRealItem);
+        showRealTrackDisplay(back);
+        state.elapsed = 0;
+        renderRealProgress();
+      }
+      spotifyApi('/me/player/previous', { method: 'POST' }).then(pollSoon).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
     state.index = pickPrevIndex();
     renderTrack();
     if (!skipShake){
@@ -1580,6 +1594,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (window.simplePlayer && window.simplePlayer.ghostGetSettings) {
       window.simplePlayer.ghostGetSettings().then(function(s){
         ghostSettings = s;
+        ghostLoaded = true;
         var group = document.getElementById('ghostGroup');
         if (group) {
           group.querySelectorAll('.pill').forEach(function(p){
@@ -1950,8 +1965,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }
       return 'No Spotify device is active. Open Spotify on your phone, computer, or a speaker and press play there first.';
     }
+    if (err && err.message === 'LOCAL_DEVICE_TIMEOUT') {
+      return "Spotify didn't start on this computer. Check that Spotify is installed (classic version) and that Settings > Ghost Spotify points to Spotify.exe.";
+    }
     if (err && err.status === 403) return 'Spotify refused that (try again?)';
-    return 'Could not reach Spotify';
+    if (err && err.status === 429) return 'Spotify is busy (too many requests) — wait a few seconds and retry.';
+    if (err && err.status) return 'Spotify error ' + err.status + ' — please retry.';
+    return 'Could not reach Spotify (check your internet connection).';
   }
 
   function renderRealProgress(){
@@ -2041,12 +2061,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function playRealUris(uris, startIndex){
     var body = { uris: uris };
     if (startIndex) body.offset = { position: startIndex };
-    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(err){ showToast(friendlySpotifyError(err)); });
+    playPath().then(function(path){ return spotifyApi(path, { method: 'PUT', body: JSON.stringify(body) }); }).catch(function(err){ showToast(friendlySpotifyError(err)); });
   }
   function playRealContext(contextUri, trackUri){
     var body = { context_uri: contextUri };
     if (trackUri) body.offset = { uri: trackUri };
-    spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) }).catch(function(err){ showToast(friendlySpotifyError(err)); });
+    playPath().then(function(path){ return spotifyApi(path, { method: 'PUT', body: JSON.stringify(body) }); }).catch(function(err){ showToast(friendlySpotifyError(err)); });
   }
 
   function invalidateLibraryCache(){
@@ -2073,6 +2093,68 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   var lastKnownTrackId = null;
+
+  // ---------------- Instant cover swap ----------------
+  // Covers used to appear only after Spotify answered AND the image
+  // downloaded. Now the next few covers (from Spotify's queue) are
+  // downloaded ahead of time, and the previous ones are remembered, so a
+  // swipe shows the new cover and title immediately; the normal poll then
+  // just confirms it.
+  var currentRealItem = null;
+  var trackHistory = [];   // most recent last
+  var queueItems = [];     // upcoming tracks, nearest first
+  var preloaded = {};      // url -> Image (kept referenced so the cache holds)
+
+  function coverUrl(t){
+    return (t && t.album && t.album.images && t.album.images[0]) ? t.album.images[0].url : '';
+  }
+  function preloadCover(t){
+    var u = coverUrl(t);
+    if (!u || preloaded[u] || !/^https:\/\//i.test(u)) return;
+    var img = new Image();
+    img.src = u;
+    preloaded[u] = img;
+    var keys = Object.keys(preloaded);
+    if (keys.length > 40) delete preloaded[keys[0]];
+  }
+  function rememberInHistory(t){
+    trackHistory.push(t);
+    if (trackHistory.length > 20) trackHistory.shift();
+    preloadCover(t);
+  }
+  function showRealTrackDisplay(t){
+    currentRealItem = t;
+    lastKnownTrackId = t.id;
+    var artUrl = coverUrl(t);
+    if (artUrl) $art.style.backgroundImage = cssUrl(artUrl);
+    $title.textContent = t.name;
+    $artist.textContent = (t.artists || []).map(function(a){ return a.name; }).join(', ');
+    $total.textContent = fmt(t.duration_ms / 1000);
+    updateNpBackgroundReal(artUrl);
+    updateRealLikedBadge(t.id);
+    renderLibraryPlayingState();
+    realPlaybackMeta.durationMs = t.duration_ms;
+    realPlaybackMeta.trackId = t.id;
+    realPlaybackMeta.trackUri = t.uri;
+  }
+  function refreshQueue(){
+    spotifyApi('/me/player/queue').then(function(q){
+      queueItems = ((q && q.queue) || []).slice(0, 3);
+      queueItems.forEach(preloadCover);
+    }).catch(function(){ /* optional optimisation: ignore failures */ });
+  }
+  // Show the expected track right now (before Spotify confirms).
+  var lastOptimisticAt = 0;
+  function pollSoon(){ pollPlaybackState(); setTimeout(pollPlaybackState, 1600); }
+  function optimisticSwitch(t){
+    if (!t) return false;
+    lastOptimisticAt = Date.now();
+    if (currentRealItem) rememberInHistory(currentRealItem);
+    showRealTrackDisplay(t);
+    state.elapsed = 0;
+    renderRealProgress();
+    return true;
+  }
 
   // ---------------- Resume last music ----------------
   // The track (and the playlist/album it came from) + position are saved
@@ -2141,7 +2223,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       : null;
     var trackOnly = { uris: [saved.trackUri], position_ms: pos };
     function put(body){
-      return spotifyApi('/me/player/play', { method: 'PUT', body: JSON.stringify(body) });
+      return playPath().then(function(path){ return spotifyApi(path, { method: 'PUT', body: JSON.stringify(body) }); });
     }
     state.playing = true;
     setPlayIcon(true);
@@ -2173,15 +2255,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     lastKnownTrackId = t.id;
 
     if (isNewTrack) {
-      var artists = (t.artists || []).map(function(a){ return a.name; }).join(', ');
-      var artUrl = t.album && t.album.images && t.album.images[0] ? t.album.images[0].url : '';
-      if (artUrl) $art.style.backgroundImage = cssUrl(artUrl);
-      $title.textContent = t.name;
-      $artist.textContent = artists;
-      $total.textContent = fmt(t.duration_ms / 1000);
-      updateNpBackgroundReal(artUrl);
-      updateRealLikedBadge(t.id);
-      renderLibraryPlayingState();
+      if (currentRealItem && currentRealItem.id !== t.id) rememberInHistory(currentRealItem);
+      showRealTrackDisplay(t);
+      refreshQueue();
     }
 
     realPlaybackMeta.durationMs = t.duration_ms;
@@ -2205,7 +2281,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function pollPlaybackState(){
     if (pollInFlight || document.hidden) return Promise.resolve();
     pollInFlight = true;
+    var startedAt = Date.now();
     return spotifyApi('/me/player').then(function(s){
+      // A reply that was requested before a swipe, or that still shows the
+      // old track right after one (Spotify takes a moment to update), must
+      // not flip the new cover back to the old one.
+      if (startedAt < lastOptimisticAt) return;
+      if (Date.now() - lastOptimisticAt < 1500 && s && s.item && currentRealItem && s.item.id !== currentRealItem.id) return;
       renderRealTrack(s);
       rememberLastPlayed(s);
       showSavedTrackIfIdle(s);
@@ -2226,19 +2308,69 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     ensureActiveDeviceOrGhost();
   }
 
-  // Proactively checks, right when we connect, whether ANY Spotify Connect
-  // device is already active anywhere on the account. If none is, and
-  // Ghost Spotify is enabled, asks main.js to launch one — rather than
-  // waiting for the user to hit Play and get an error first.
-  function ensureActiveDeviceOrGhost(){
-    if (!ghostSettings.enabled) return;
-    spotifyApi('/me/player/devices').then(function(res){
+  // ---------------- "Play on this computer only" ----------------
+  // With Ghost Spotify on, music must come out of THIS computer, never a
+  // phone or speaker that happened to be the last active device. So:
+  //  - we look for this computer's Spotify Connect device (Spotify names it
+  //    after the Windows computer name), starting the hidden Spotify if it
+  //    isn't there yet;
+  //  - every "start playing" request is sent with that device's id, which
+  //    also moves playback over from any other device;
+  //  - at connect time, playback is moved here (paused) if it's elsewhere.
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  function findLocalDevice(){
+    return spotifyApi('/me/player/devices').then(function(res){
       var devices = (res && res.devices) || [];
-      var hasActive = devices.some(function(d){ return d.is_active; });
-      if (!hasActive && window.simplePlayer.ghostNoActiveDevice) {
-        window.simplePlayer.ghostNoActiveDevice();
+      var name = (ghostSettings.computerName || '').toLowerCase();
+      var byName = devices.filter(function(d){ return name && d.name && d.name.toLowerCase() === name; })[0];
+      if (byName) return byName;
+      var computers = devices.filter(function(d){ return d.type === 'Computer'; });
+      return computers.length === 1 ? computers[0] : null;
+    });
+  }
+
+  var localDeviceInflight = null;
+  // Resolves to this computer's device id, or null when Ghost Spotify is
+  // off / unsupported / the device never showed up (then we fall back to
+  // whatever device is active, as before).
+  function ensureLocalDevice(){
+    if (localDeviceInflight) return localDeviceInflight;
+    var ready = ghostLoaded ? Promise.resolve() : window.simplePlayer.ghostGetSettings().then(function(s){ ghostSettings = s; ghostLoaded = true; });
+    localDeviceInflight = ready.then(async function(){
+      if (!ghostSettings.enabled || !ghostSettings.platformSupported) return null;
+      for (var i = 0; i < 10; i++) {
+        var d = await findLocalDevice();
+        if (d) return d.id;
+        if (i === 0) {
+          showToast('Starting Spotify on this computer…');
+          window.simplePlayer.ghostNoActiveDevice();
+        }
+        await sleep(2500);
       }
-    }).catch(function(){ /* ignore: worst case the user hits Play and gets the normal flow */ });
+      throw new Error('LOCAL_DEVICE_TIMEOUT');
+    }).then(function(id){ localDeviceInflight = null; return id; },
+            function(err){ localDeviceInflight = null; throw err; });
+    return localDeviceInflight;
+  }
+
+  function playPath(){
+    if (!window.simplePlayer || !window.simplePlayer.ghostGetSettings) return Promise.resolve('/me/player/play');
+    return ensureLocalDevice().then(function(id){
+      return '/me/player/play' + (id ? '?device_id=' + encodeURIComponent(id) : '');
+    });
+  }
+
+  // At connect: if playback is on another device, bring it here (paused).
+  function ensureActiveDeviceOrGhost(){
+    if (!window.simplePlayer || !window.simplePlayer.ghostGetSettings) return;
+    ensureLocalDevice().then(function(id){
+      if (!id) return;
+      return spotifyApi('/me/player').then(function(s){
+        if (s && s.device && s.device.id === id) return;
+        return spotifyApi('/me/player', { method: 'PUT', body: JSON.stringify({ device_ids: [id], play: false }) });
+      });
+    }).catch(function(){ /* worst case: the first Play press does the same job */ });
   }
 
   onVolumeChange = function(vol){

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog, screen, shell } = require('electron');
 const path = require('path');
+const os = require('os');
 const fs = require('fs');
 const { spawn, execFile } = require('child_process');
 const Store = require('electron-store');
@@ -331,10 +332,24 @@ function hideWindowsOfPid(pid) {
   });
 }
 
-function launchGhostSpotify() {
+// True if a Spotify.exe process is already running (the user's own, or one
+// we launched). Launching a second copy would just pop the existing window
+// to the front instead of starting anything, so we skip it.
+function isSpotifyRunning() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(false);
+    execFile('tasklist', ['/FI', 'IMAGENAME eq Spotify.exe', '/NH'], (err, stdout) => {
+      resolve(!err && /Spotify\.exe/i.test(String(stdout)));
+    });
+  });
+}
+
+async function launchGhostSpotify() {
   if (ghostSpotifyPid) return; // already launched one this session
   const exe = resolveSpotifyExePath();
   if (!exe) return;
+  if (await isSpotifyRunning()) return; // it's already up: its Connect device will show by itself
+  if (ghostSpotifyPid) return; // another call won the race while we checked
   try {
     const child = spawn(exe, ['--minimized'], { detached: true, stdio: 'ignore' });
     ghostSpotifyPid = child.pid;
@@ -346,8 +361,8 @@ function launchGhostSpotify() {
       setTimeout(() => { if (ghostSpotifyPid) hideWindowsOfPid(ghostSpotifyPid); }, delay);
     });
   } catch (err) {
-    // Silent: worst case, the user still sees the normal "no active
-    // device" message and can open Spotify themselves as before.
+    // Silent: worst case the renderer's "Starting Spotify..." wait times out
+    // and the user sees a clear message.
   }
 }
 
@@ -421,7 +436,9 @@ ipcMain.handle('spotify:get-access-token', async () => {
 ipcMain.handle('ghost:get-settings', () => ({
   enabled: store.get('ghostSpotifyEnabled'),
   exePath: resolveSpotifyExePath(),
-  platformSupported: process.platform === 'win32'
+  platformSupported: process.platform === 'win32',
+  // Spotify's desktop app names its Connect device after the computer.
+  computerName: os.hostname()
 }));
 ipcMain.handle('ghost:set-enabled', (event, enabled) => {
   store.set('ghostSpotifyEnabled', !!enabled);
