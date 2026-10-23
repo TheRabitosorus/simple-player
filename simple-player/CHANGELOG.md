@@ -2,6 +2,13 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.11.0 — 23 octobre 2026
+
+**Nouveau geste pour le volume en mode idle, suite à ta suggestion.** Le geste "glisser n'importe où sur la pochette pour ajuster le son" s'est révélé trop peu fiable sur tactile (deux corrections n'ont pas suffi), donc je l'ai remplacé par une approche plus simple, comme tu l'as proposé :
+
+- La pochette ne gère plus que : **tap** = play/pause, **glisser horizontalement** = changer de piste.
+- **Toucher le bord droit de l'écran** (là où se trouve la barre de volume, même quand elle est invisible en idle) la fait apparaître immédiatement, et tu peux continuer à glisser le doigt vers le haut/bas dans ce même geste pour régler le son.
+
 ## v1.10.2 — 23 octobre 2026
 
 - **Trouvé la vraie cause de la barre de volume invisible — spécifique au tactile.** `touch-action:pan-y` était posé sur la zone de swipe, ce qui dit explicitement à Chromium (le moteur derrière Electron) de prendre lui-même en charge le geste vertical, comme un scroll natif. Sur tactile, ça annulait notre propre geste (volume) en plein milieu, avant que la barre ait eu le temps de s'afficher — alors qu'à la souris, cette propriété n'a aucun effet, donc ça marchait très bien (ce qui m'a mis sur la piste). Remplacé par `touch-action:none`, puisqu'on gère déjà nous-mêmes les deux axes (horizontal = changer de piste, vertical = volume). Merci d'avoir précisé que ça marchait à la souris — sans ce détail, je n'aurais pas trouvé celle-là.
