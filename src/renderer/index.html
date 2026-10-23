@@ -175,6 +175,22 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .view h2{font-family:var(--display-font);font-style:italic;font-weight:600;font-size:22px;margin:16px 0 4px;}
 .lib-section h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--fg-faint);margin:22px 0 10px;font-weight:700;}
 
+/* Liked Songs shown as a collapsed "folder" by default — just this one
+   row — so a long list doesn't swamp the Library tab; clicking it
+   expands #likedList below. */
+.liked-folder{
+  display:flex;align-items:center;gap:12px;width:100%;
+  padding:11px 12px;border-radius:12px;
+  background:var(--bg-elev);border:1px solid var(--border);
+}
+.liked-folder:hover{background:var(--bg-elev-2);}
+.liked-folder-icon{width:42px;height:42px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);flex:0 0 auto;}
+.liked-folder-name{font-size:14px;font-weight:700;flex:1 1 auto;text-align:left;}
+.liked-folder-count{font-size:12px;color:var(--fg-faint);flex:0 0 auto;}
+.liked-folder-chevron{width:18px;height:18px;color:var(--fg-faint);flex:0 0 auto;transition:transform .2s ease;}
+.liked-folder[aria-expanded="true"] .liked-folder-chevron{transform:rotate(90deg);}
+#likedList{margin-top:10px;}
+
 .track-list{display:flex;flex-direction:column;gap:2px;}
 .track-row{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:10px;}
 .track-row:hover{background:var(--bg-elev);}
@@ -412,12 +428,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       <div class="scroller px">
         <h2>Library</h2>
         <div class="lib-section">
-          <h3>Liked Songs</h3>
-          <div class="track-list" id="likedList"></div>
-        </div>
-        <div class="lib-section">
           <h3>Playlists</h3>
           <div class="playlist-grid" id="playlistGrid"></div>
+        </div>
+        <div class="lib-section">
+          <button class="liked-folder" id="likedFolderBtn" aria-expanded="false" aria-controls="likedList">
+            <div class="liked-folder-icon">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+            </div>
+            <span class="liked-folder-name">Liked Songs</span>
+            <span class="liked-folder-count" id="likedFolderCount"></span>
+            <svg class="liked-folder-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+          </button>
+          <div class="track-list" id="likedList" hidden></div>
         </div>
       </div>
     </section>
@@ -926,8 +949,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // class, so they can never visibly affect one another. The next
       // regular poll reconciles if the request actually failed.
       $shuffleBtn.classList.toggle('on', next);
-      spotifyApi('/me/player/shuffle?state=' + next, { method: 'PUT' }).catch(function(){
+      lastShuffleChangeAt = Date.now();
+      spotifyApi('/me/player/shuffle?state=' + next, { method: 'PUT' }).catch(function(err){
         $shuffleBtn.classList.toggle('on', !next);
+        showToast(/\b403\b/.test(err.message) ? 'Spotify refused that (try again?)' : 'Could not reach Spotify');
       });
       return;
     }
@@ -939,8 +964,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var isOn = $repeatBtn.classList.contains('on');
       var newState = isOn ? 'off' : 'context';
       $repeatBtn.classList.toggle('on', !isOn);
-      spotifyApi('/me/player/repeat?state=' + newState, { method: 'PUT' }).catch(function(){
+      lastRepeatChangeAt = Date.now();
+      spotifyApi('/me/player/repeat?state=' + newState, { method: 'PUT' }).catch(function(err){
         $repeatBtn.classList.toggle('on', isOn);
+        showToast(/\b403\b/.test(err.message) ? 'Spotify refused that (try again?)' : 'Could not reach Spotify');
       });
       return;
     }
@@ -1164,24 +1191,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     render();
   })();
 
+  // Shared toast, used by the add-to-playlist menu and by anything else
+  // that needs a quick, non-blocking status message (e.g. shuffle/repeat
+  // failures below).
+  var $toast = document.getElementById('toast');
+  var toastTimer = null;
+  function showToast(msg){
+    $toast.textContent = msg;
+    $toast.hidden = false;
+    requestAnimationFrame(function(){ $toast.classList.add('show'); });
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){
+      $toast.classList.remove('show');
+      setTimeout(function(){ $toast.hidden = true; }, 200);
+    }, 1800);
+  }
+
   // ---------------- Ajouter à une bibliothèque ----------------
   (function(){
     var addBtn = document.getElementById('addBtn');
     var menu = document.getElementById('addMenu');
     var backdrop = document.getElementById('addBackdrop');
-    var toast = document.getElementById('toast');
-    var toastTimer = null;
-
-    function showToast(msg){
-      toast.textContent = msg;
-      toast.hidden = false;
-      requestAnimationFrame(function(){ toast.classList.add('show'); });
-      if (toastTimer) clearTimeout(toastTimer);
-      toastTimer = setTimeout(function(){
-        toast.classList.remove('show');
-        setTimeout(function(){ toast.hidden = true; }, 200);
-      }, 1800);
-    }
 
     function closeMenu(){
       menu.hidden = true;
@@ -1473,14 +1503,29 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     return row;
   }
 
+  var $likedFolderCount = document.getElementById('likedFolderCount');
+  function setLikedFolderCount(n){
+    $likedFolderCount.textContent = (n === null) ? '…' : (n + (n === 1 ? ' song' : ' songs'));
+  }
+  (function(){
+    var btn = document.getElementById('likedFolderBtn');
+    var list = document.getElementById('likedList');
+    btn.addEventListener('click', function(){
+      var expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      list.hidden = expanded;
+    });
+  })();
+
   function renderLibrary(){
     var likedEl = document.getElementById('likedList');
     var grid = document.getElementById('playlistGrid');
 
     if (useRealPlayback){
-      likedEl.innerHTML = '<div class="search-empty">Loading…</div>';
+      setLikedFolderCount(null);
       fetchRealLikedTracks().then(function(tracks){
         likedEl.innerHTML = '';
+        setLikedFolderCount(tracks.length);
         if (!tracks.length){ likedEl.innerHTML = '<div class="search-empty">No liked songs yet.</div>'; return; }
         var uris = tracks.map(function(t){ return t.uri; });
         tracks.forEach(function(t, i){
@@ -1516,6 +1561,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // Not connected to Spotify: fictional demo data, as before.
     var likedTracks = LIKED_IDS.map(trackById).filter(Boolean);
     likedEl.innerHTML = '';
+    setLikedFolderCount(likedTracks.length);
     likedTracks.forEach(function(t, i){
       likedEl.appendChild(trackRow(t, function(){
         state.queue = likedTracks.slice();
@@ -1631,6 +1677,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // device other than this one — the Web Playback SDK's events only ever
   // report this device's own state, not the account's.
   var realPlaybackMeta = { durationMs: 0, trackId: null, trackUri: null, contextUri: null };
+  // Timestamps of the last local shuffle/repeat toggle, so a periodic
+  // poll landing right after one doesn't clobber it back before Spotify's
+  // own backend has actually caught up (a real, observed propagation gap).
+  var lastShuffleChangeAt = 0;
+  var lastRepeatChangeAt = 0;
+  var REAL_STATE_GRACE_MS = 3000;
   var realProgressTimer = null;
   var pollTimer = null;
   var playlistNameCache = {};
@@ -1800,8 +1852,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     state.playing = !!s.is_playing;
     setPlayIcon(state.playing);
     renderRealProgress();
-    $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
-    $repeatBtn.classList.toggle('on', s.repeat_state === 'context' || s.repeat_state === 'track');
+    if (Date.now() - lastShuffleChangeAt > REAL_STATE_GRACE_MS) $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
+    if (Date.now() - lastRepeatChangeAt > REAL_STATE_GRACE_MS) $repeatBtn.classList.toggle('on', s.repeat_state === 'context' || s.repeat_state === 'track');
     updateRealPlaylistBadge(realPlaybackMeta.contextUri);
     startRealProgressTimer();
   }

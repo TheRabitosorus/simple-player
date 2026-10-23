@@ -2,6 +2,11 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.9.0 — 23 octobre 2026
+
+- Dans **Library**, tes **vraies playlists** s'affichent maintenant en premier. **Liked Songs** vient après, et apparaît comme un dossier replié (juste une rangée avec le nombre de chansons) — clique dessus pour dérouler la liste complète.
+- **Shuffle et Repeat** : j'ai ajouté un vrai message d'erreur ("Spotify refused that") si l'activation échoue réellement côté Spotify, plutôt que le bouton qui se rallume puis s'éteint sans explication. J'ai aussi ajouté une petite protection pour qu'une vérification automatique (toutes les 2 secondes) n'annule pas ton changement avant que Spotify ait eu le temps de le confirmer. **Si le bouton ne reste toujours pas allumé après cette mise à jour, dis-moi exactement ce qui s'affiche** (le bouton redevient gris tout seul ? un message apparaît ?) — ça me dira si c'est Spotify qui refuse la commande plutôt qu'un bug d'affichage.
+
 ## v1.8.0 — 23 octobre 2026
 
 - **Important : retour en arrière sur la barre du bas.** La rendre cachée par défaut (depuis la v1.4.0) causait plus de problèmes qu'elle n'en résolvait — sa zone de détection a fini par voler les clics du bouton "+". La barre Player/Library/Search/Settings est donc de nouveau **toujours visible** (comme dans le mockup original), et se cache seulement en mode idle comme le reste de l'interface. Le bouton "+" refonctionne normalement : il ouvre bien le menu "ajouter à une playlist".
