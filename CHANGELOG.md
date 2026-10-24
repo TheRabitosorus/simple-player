@@ -2,6 +2,20 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.30 — 23 octobre 2026
+
+- **Tick verte après ajout à une playlist.** Après avoir ajouté un morceau à une playlist (en mode normal ou idle), la tick passe immédiatement au vert sans attendre le prochain changement de piste. L'état était perdu parce que `updateLikedBadge` (mode démo) était appelée au lieu de `updateRealLikedBadge`.
+- **Overlay du menu playlist.** Le fond semi-transparent derrière le menu de playlists était invisible (pas de `background`), ce qui donnait l'impression que l'écran était figé. Il affiche maintenant un assombrissement léger clair et disparaît bien à la fermeture.
+
+## v1.20.29 — 23 octobre 2026
+
+- **Molette dans Settings.** La molette faisait monter/descendre le volume même quand la liste des réglages était ouverte. Elle fait maintenant défiler les listes normalement et ne touche au volume que depuis le player.
+- **Rafraîchissement des boutons.** Play/pause, next, prev, shuffle et repeat n'avaient plus à attendre un clic parasite pour afficher le bon état. Les polls rapides après une action ignorent maintenant un éventuel poll déjà en cours, et l'état play/pause est protégé 3 s contre un retour stale de l'API Spotify.
+
+## v1.20.28 — 23 octobre 2026
+
+- **Idle — tick centrée exactement.** Quelle que soit la taille de la fenêtre, la tick se trouve toujours à égale distance entre le haut de l'application et le haut de la pochette.
+
 ## v1.20.27 — 23 octobre 2026
 
 - **Idle — tick = bouton d'ajout à une playlist.** Le bouton + disparaît en mode idle. À la place, la tique verte (ou grise) est maintenant cliquable/tactile et ouvre directement le menu « ajouter à une playlist » au centre de l'écran.

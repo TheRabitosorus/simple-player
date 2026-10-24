@@ -334,7 +334,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .add-btn:active{transform:scale(.92);}
 .add-btn.added{color:var(--accent);border-color:var(--accent);}
 
-#addBackdrop{position:fixed;inset:0;z-index:35;}
+#addBackdrop{position:fixed;inset:0;z-index:35;background:rgba(0,0,0,.25);}
 
 #addMenu{
   position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
@@ -887,8 +887,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var onVolumeChange = null; // wired to the Windows volume (or Spotify's) below
 
   // Mouse wheel on the window adjusts volume (5% per notch).
+  // Disabled when the Settings (or Library / Search) view is open so the
+  // wheel can scroll those lists normally.
   window.addEventListener('wheel', function(e){
     if (!onVolumeChange) return;
+    // If the scroll target is inside a scrollable view (settings, library,
+    // search), let the browser handle it — don't steal it for volume.
+    if (e.target && e.target.closest && e.target.closest('.view')) return;
     e.preventDefault();
     var delta = e.deltaY > 0 ? -5 : 5; // scroll down = lower, scroll up = raise
     state.volume = Math.max(0, Math.min(100, state.volume + delta));
@@ -1046,11 +1051,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Art top relative to swipeZone:
       var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
       var artBotInSw = artTopInSw + size;
-      // Liked badge: centred in the space above the cover, +10px down
+      // Liked badge: exactly halfway between the window top and the cover top
       if ($lb) {
-        var zoneCenter = artTopInSw / 2;
-        var badgeH = 44;
-        $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2 + 10)) + 'px';
+        var badgeH = $lb.getBoundingClientRect().height || 44;
+        $lb.style.top = Math.round(Math.max(4, artTopInSw / 2 - badgeH / 2)) + 'px';
       }
       // + button position is handled by CSS (bottom-right corner); clear any
       // leftover inline top that a previous JS pass may have set.
@@ -1077,8 +1081,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // without this, pressing play/pause visibly does nothing for up
       // to 2 seconds. The next poll still confirms/corrects it either way.
       state.playing = true;
+      lastPlayChangeAt = Date.now();
       setPlayIcon(true);
-      playPath().then(function(path){ return spotifyApi(path, { method: 'PUT' }); }).catch(function(err){
+      playPath().then(function(path){ return spotifyApi(path, { method: 'PUT' }).then(pollSoon); }).catch(function(err){
         state.playing = false;
         setPlayIcon(false);
         showToast(friendlySpotifyError(err));
@@ -1112,8 +1117,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function pause(){
     if (useRealPlayback){
       state.playing = false;
+      lastPlayChangeAt = Date.now();
       setPlayIcon(false);
-      spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(err){
+      spotifyApi('/me/player/pause', { method: 'PUT' }).then(pollSoon).catch(function(err){
         showToast(friendlySpotifyError(err));
       });
       return;
@@ -1560,8 +1566,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         body: JSON.stringify({ uris: [trackUri] })
       }).then(function(){
         addedPlaylistSet.add(trackId);
-        updateLikedBadge();
-        showToast('Added to "' + pl.name + '"');
+        if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
+        showToast('Ajouté à "' + pl.name + '"');
       }).catch(function(err){
         if (err && err.status === 403 && window.simplePlayer && window.simplePlayer.spotifyConnect) {
           // Token is missing the playlist-modify scope — show a dialog that
@@ -1591,7 +1597,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
                 body: JSON.stringify({ uris: [trackUri] })
               }).then(function(){
                 addedPlaylistSet.add(trackId);
-                updateLikedBadge();
+                if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
                 showToast('Ajouté à "' + pl.name + '"');
               }).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
             });
@@ -2245,7 +2251,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // own backend has actually caught up (a real, observed propagation gap).
   var lastShuffleChangeAt = 0;
   var lastRepeatChangeAt = 0;
+  var lastPlayChangeAt = 0;
   var REAL_STATE_GRACE_MS = 5000; // after pressing shuffle/repeat, ignore polls this long (Spotify can lag)
+  var PLAY_GRACE_MS = 3000; // after pressing play/pause, don't let a stale poll flip it back
   var realProgressTimer = null;
   var pollTimer = null;
   var playlistNameCache = {};
@@ -2565,6 +2573,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function updateRealLikedBadge(trackId){
     if (!trackId) return;
+    // If we already know this track was added to a playlist this session,
+    // show the green tick immediately without waiting for the API.
+    if (addedPlaylistSet.has(trackId)){
+      $likedBadge.classList.add('on');
+      $likedBadge.title = 'In a playlist';
+    }
     spotifyApi('/me/tracks/contains?ids=' + trackId).then(function(result){
       var liked = !!(result && result[0]) || addedPlaylistSet.has(trackId);
       $likedBadge.classList.toggle('on', liked);
@@ -2665,9 +2679,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // rapid user actions (skip, skip, skip) don't stack up bursts of polls.
     pollSoonTimers.forEach(function(t){ clearTimeout(t); });
     pollSoonTimers = [];
+    // Force a poll even if one is already in flight — after a user action
+    // (next, prev, play/pause) we need fresh state, not a stale in-progress one.
+    pollInFlight = false;
     pollPlaybackState();
-    pollSoonTimers.push(setTimeout(pollPlaybackState, 800));
-    pollSoonTimers.push(setTimeout(pollPlaybackState, 1800));
+    pollSoonTimers.push(setTimeout(function(){ pollInFlight = false; pollPlaybackState(); }, 800));
+    pollSoonTimers.push(setTimeout(function(){ pollInFlight = false; pollPlaybackState(); }, 1800));
   }
   function optimisticSwitch(t){
     if (!t) return false;
@@ -2789,8 +2806,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     realPlaybackMeta.contextUri = s.context && s.context.uri;
     if (isNewTrack) notePlaylistPlayed(realPlaybackMeta.contextUri);
     state.elapsed = s.progress_ms / 1000;
-    state.playing = !!s.is_playing;
-    setPlayIcon(state.playing);
+    // Don't let a stale poll flip the play/pause icon back right after the
+    // user pressed a button — Spotify's API can lag up to ~2-3 s behind.
+    if (Date.now() - lastPlayChangeAt > PLAY_GRACE_MS) {
+      state.playing = !!s.is_playing;
+      setPlayIcon(state.playing);
+    }
     renderRealProgress();
     if (Date.now() - lastShuffleChangeAt > REAL_STATE_GRACE_MS) $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
     if (Date.now() - lastRepeatChangeAt > REAL_STATE_GRACE_MS) $repeatBtn.classList.toggle('on', s.repeat_state === 'context' || s.repeat_state === 'track');
