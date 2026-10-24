@@ -2,6 +2,23 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.19.5 — 23 octobre 2026
+
+- **Textes deux fois plus grands.** Compteur de temps (élapsé / total) : 28 px au lieu de 14 px. Pourcentage de volume en idle : 24 px au lieu de 12 px.
+
+## v1.19.4 — 23 octobre 2026
+
+- **Bibliothèque : pochettes et textes deux fois plus grands.** Pochettes : 116 px (au lieu de 58 px). Titre : 22 px, sous-titre : 17 px.
+- **Tique « liké » en mode idle.** Deux fois plus grande (44 px). En idle, positionnée et centrée automatiquement dans l'espace entre le bord supérieur de la fenêtre et le haut de la pochette.
+- **Volume en mode idle : nouvelle barre centrée dans le strip droit.** La barre apparaît maintenant à l'intérieur du strip, centrée horizontalement, au lieu de glisser depuis le bord droit. Un seul tap suffit pour la faire apparaître ET commencer à ajuster le volume en même temps (glisser dès le premier tap, sans avoir à tapoter deux fois). La barre disparaît au bout de 2,5 s sans interaction. Le réglage est bien transmis au volume réel (Windows ou Spotify selon la configuration).
+- **Sortir du mode idle : glisser vers le haut.** Remplace le double-tap. Glisser vers le haut de plus de 55 px n'importe où dans le player (sauf dans le strip volume) fait revenir au player normal.
+
+## v1.19.3 — 23 octobre 2026
+
+- **Correction du symbole sur la pochette en idle.** L'icône était inversée : ▶ s'affichait en pause et ⏸ pendant la lecture. Maintenant :
+  - En pause → symbole ⏸ reste affiché en vert.
+  - En lecture → symbole ▶ s'affiche brièvement puis disparaît en fondu.
+
 ## v1.19.2 — 23 octobre 2026
 
 - **Mode idle : symbole play/pause sur la pochette.**

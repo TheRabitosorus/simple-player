@@ -101,13 +101,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    centered column (art included) stays shifted left by that reserved
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;}
-/* One tap on that space reveals the rail, sliding in from the right, and
-   it stays up (draggable, exactly like the normal always-visible rail)
-   until a few seconds pass with no interaction. The swipe zone's right
-   padding comes back too while this is open, so the (much larger,
-   idle-sized) cover art doesn't crowd it out visually. */
-#app.idle.volume-revealed #volumeRail{opacity:1;transform:translateX(0);pointer-events:auto;transition:opacity .28s ease, transform .32s cubic-bezier(.2,.7,.3,1);}
-#app.idle.volume-revealed #swipeZone{padding-right:calc(var(--rail-w) + 12px);transition:padding-right .28s ease;}
+/* The idle-mode volume bar lives INSIDE #idleVolumeZone, centred in the strip. */
+#idleVolBar{position:absolute;width:5px;top:15%;bottom:15%;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
+#app.idle.volume-revealed #idleVolBar{opacity:1;}
+#idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;background:var(--accent);}
+#idleVolThumb{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 1px 6px rgba(0,0,0,.5);}
+#idleVolLabel{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);font-size:24px;font-weight:700;color:var(--fg-dim);white-space:nowrap;}
 #art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
@@ -117,6 +116,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .liked-badge{display:flex;align-items:center;justify-content:center;color:var(--fg-faint);flex:0 0 auto;transition:color .15s;}
 .liked-badge svg{width:22px;height:22px;flex:0 0 auto;}
 .liked-badge.on{color:var(--accent);}
+/* In idle mode the badge is positioned absolutely in the top space and shown 2× bigger */
+#app.idle #likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;}
+#app.idle .liked-badge svg{width:44px;height:44px;}
 
 /* artWrap takes exactly whatever vertical space is left over after its
    siblings (liked badge, track info, progress, transport, add-to-library)
@@ -163,7 +165,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* Same trick as the volume rail: a wider, invisible hit area layered
    over the thin visible bar, so a finger has real room to land on it. */
 #progressFill{height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .18s linear;}
-#timeRow{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono-font);font-variant-numeric:tabular-nums;font-size:14px;color:var(--fg-dim);}
+#timeRow{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono-font);font-variant-numeric:tabular-nums;font-size:28px;color:var(--fg-dim);}
 
 #transport{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3vw,26px);flex:0 0 auto;}
 .ctrl{display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--fg);flex:0 0 auto;transition:background .12s,color .12s,transform .08s;}
@@ -215,12 +217,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .track-row.playing .ttl{color:var(--accent);}
 
 .playlist-grid.as-list{display:flex;flex-direction:column;gap:2px;}
-.pl-row{display:flex;align-items:center;gap:14px;padding:8px 6px;border-radius:10px;cursor:pointer;}
+.pl-row{display:flex;align-items:center;gap:20px;padding:12px 6px;border-radius:12px;cursor:pointer;}
 .pl-row:hover,.pl-row:active{background:var(--bg-elev);}
-.pl-row .cover{width:58px;height:58px;border-radius:6px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+.pl-row .cover{width:116px;height:116px;border-radius:10px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
 .pl-row .meta{min-width:0;flex:1 1 auto;}
-.pl-row .name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pl-row .sub{font-size:12.5px;color:var(--fg-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.pl-row .name{font-size:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pl-row .sub{font-size:17px;color:var(--fg-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;}
 .playlist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;}
 .search-section{margin:18px 4px 4px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-faint);}
 .search-more{display:block;margin:10px auto 4px;padding:10px 18px;border-radius:12px;background:var(--bg-elev-2);color:var(--fg);font-weight:700;font-size:13px;}
@@ -449,7 +451,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
            rail; once revealed, dragging in it adjusts the volume. Inert
            (pointer-events:none) outside idle mode, where the always-
            visible rail's own controls handle things as usual. -->
-      <div id="idleVolumeZone"></div>
+      <div id="idleVolumeZone">
+        <div id="idleVolBar" aria-hidden="true">
+          <div id="idleVolFill"></div>
+          <div id="idleVolThumb"></div>
+          <span id="idleVolLabel"></span>
+        </div>
+      </div>
     </section>
 
     <!-- Bibliothèque -->
@@ -903,7 +911,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function setPlayIcon(playing){
     $playIcon.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
-    $artOverlayIcon.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    $artOverlayIcon.innerHTML = playing ? ICON_PLAY : ICON_PAUSE;
     // While paused, the pause icon stays visibly shown on the cover art at
     // all times (not just on touch/press) — the main visible cue in idle
     // mode, where the transport controls are hidden.
@@ -936,11 +944,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var parentRect = (idleZone.offsetParent || document.body).getBoundingClientRect();
       var gapLeft = artRect.right + 8 - parentRect.left;   // just right of the cover
       var gapWidth = Math.max(0, parentRect.width - gapLeft);
-      // Only a strip hugging the RIGHT edge is the volume zone (about 45% of
-      // the free space, 48-120px). The rest of the gap stays part of the
-      // normal tap area, so a double-tap there can leave immersive mode.
       var strip = Math.min(gapWidth, Math.max(48, Math.min(120, gapWidth * 0.45)));
       idleZone.style.left = (parentRect.width - strip) + 'px';
+    }
+    // Position the liked badge centred in the space above the cover in idle mode.
+    var $lb = document.getElementById('likedBadge');
+    if ($lb) {
+      if (isIdle) {
+        var swEl = $artWrap.parentElement; // #swipeZone
+        var swRect = swEl.getBoundingClientRect();
+        var awRect = $artWrap.getBoundingClientRect();
+        // artWrap centres #art; art top relative to swipeZone:
+        var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
+        var badgeH = 44; // 2× icon height
+        $lb.style.top = Math.round(Math.max(0, artTopInSw / 2 - badgeH / 2)) + 'px';
+      } else {
+        $lb.style.top = '';
+      }
     }
   }
   window.addEventListener('resize', fitArtSquare);
@@ -1176,7 +1196,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var zone = document.getElementById('swipeZone');
     var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
-    var lastTapTime = 0;
     var downOnArt = false; // did this touch start on the cover?
 
     function noTransition(){ $art.style.transition = 'none'; }
@@ -1198,12 +1217,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var dx = e.clientX - startX, dy = e.clientY - startY;
       if (locked === null){
         if (Math.abs(dx) > 6 || Math.abs(dy) > 6){
-          // A predominantly vertical movement here is simply not a swipe —
-          // it's ignored (no volume handling anymore; see the dedicated
-          // volume zone), so play/pause-by-tap and horizontal swipe never
-          // get confused with it.
           locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
         }
+      }
+      // Swipe up (idle only): exit immersive mode.
+      if (locked === 'y'){
+        if (dy < -55 && document.getElementById('app').classList.contains('idle')){
+          dragging = false; locked = null;
+          snapBack();
+          idle.exitIdle();
+        }
+        return;
       }
       if (locked !== 'x') return;
       noTransition();
@@ -1248,21 +1272,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
         else snapBack();
       } else if (locked === null){
-        // A tap, not a drag. Each tap on the cover toggles play/pause on its
-        // own (see below) — this also tracks whether two taps landed close together in time, which is
-        // the one thing allowed to dismiss immersive mode. Toggling twice
-        // cancels out, so a double-tap leaves playback state unchanged.
+        // A tap, not a drag. Tap on the cover toggles play/pause.
         // The toggle is done HERE rather than in a 'click' listener on the
         // cover: this zone holds pointer capture during the gesture, which
         // makes the browser aim the click at the zone instead of the cover.
         if (downOnArt) togglePlay();
-        var now = Date.now();
-        if (now - lastTapTime < 350){
-          lastTapTime = 0;
-          idle.exitIdle();
-        } else {
-          lastTapTime = now;
-        }
       }
       locked = null;
     }
@@ -1278,40 +1292,42 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // of that space stays free for the double-tap that leaves immersive mode. While
   // idle: a single tap here reveals the volume rail (sliding in from the
   // right); once revealed, dragging up/down in this same zone adjusts
-  // the volume, like the always-visible rail does outside idle mode.
-  // Splitting "reveal" and "adjust" into two separate steps, instead of
-  // trying to detect both within one continuous gesture, is deliberate —
-  // the combined version proved unreliable on real touch input.
+  // the volume. A tap reveals the bar; a drag (including from that same
+  // first touch) adjusts the volume immediately and calls onVolumeChange.
   (function(){
     var zone = document.getElementById('idleVolumeZone');
     var app = document.getElementById('app');
     var dragging = false, startY = 0, startVolume = 0, pid = null, hideTimer = null;
+    var iFill = document.getElementById('idleVolFill');
+    var iThumb = document.getElementById('idleVolThumb');
+    var iLabel = document.getElementById('idleVolLabel');
 
     function isIdle(){ return app.classList.contains('idle'); }
-    function isRevealed(){ return app.classList.contains('volume-revealed'); }
+
+    function updateIdleBar(){
+      if (!iFill) return;
+      var pct = state.volume;
+      iFill.style.height = pct + '%';
+      if (iThumb) iThumb.style.bottom = pct + '%';
+      if (iLabel) iLabel.textContent = Math.round(pct) + '%';
+    }
 
     function scheduleHide(){
       if (hideTimer) clearTimeout(hideTimer);
       hideTimer = setTimeout(function(){
         app.classList.remove('volume-revealed');
-        fitArtSquare();
         hideTimer = null;
       }, 2500);
     }
 
     zone.addEventListener('pointerdown', function(e){
       if (!isIdle()) return;
-      if (!isRevealed()){
-        // First tap while hidden: just reveal it. Deliberately NOT also
-        // starting a drag from this same touch, so an imprecise first
-        // tap can't also yank the volume before the rail is even visible.
+      // Reveal the bar if not already shown, then start drag immediately —
+      // even on the first touch so tap-and-drag works in one gesture.
+      if (!app.classList.contains('volume-revealed')){
         app.classList.add('volume-revealed');
-        fitArtSquare();
-        scheduleHide();
-        e.preventDefault();
-        return;
+        updateIdleBar();
       }
-      // Already revealed: this touch adjusts the volume directly.
       dragging = true; pid = e.pointerId;
       startY = e.clientY; startVolume = state.volume;
       try { zone.setPointerCapture(pid); } catch(err){}
@@ -1324,6 +1340,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var dy = e.clientY - startY;
       var deltaVol = -(dy / VOLUME_DRAG_PX) * 100;
       state.volume = Math.max(0, Math.min(100, startVolume + deltaVol));
+      updateIdleBar();
       if (updateVolumeDisplay) updateVolumeDisplay();
       if (onVolumeChange) onVolumeChange(state.volume);
       scheduleHide();
