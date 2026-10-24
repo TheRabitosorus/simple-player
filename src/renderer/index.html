@@ -154,7 +154,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{text-align:center;max-width:min(80vw,420px);flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;}
-#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-8px;padding-bottom:0;}
+#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-28px;padding-bottom:0;}
 #trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -286,8 +286,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
 #app.idle #addToLibraryWrap{position:absolute;left:0;right:0;display:flex;justify-content:center;}
-#app.idle .add-btn{width:156px;height:156px;border-radius:50%;}
-#app.idle .add-btn svg{width:66px;height:66px;}
+#app.idle .add-btn{width:312px;height:312px;border-radius:50%;}
+#app.idle .add-btn svg{width:132px;height:132px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -611,13 +611,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   <nav id="tabbar">
     <div class="px">
-      <button class="tab active" data-view="player">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        <span>Player</span>
-      </button>
       <button class="tab" data-view="library">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
         <span>Library</span>
+      </button>
+      <button class="tab active" data-view="player">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span>Player</span>
       </button>
       <button class="tab" data-view="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1005,7 +1005,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           ? $artist.getBoundingClientRect().bottom - swRect.top
           : artBotInSw;
         var spaceBelow = swRect.height - artistBotInSw;
-        var btnH = 156; // idle button is 3× (156px)
+        var btnH = 312; // idle button is 6× (312px)
         var btnTop = artistBotInSw + Math.round((spaceBelow - btnH) / 2);
         $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, btnTop)) + 'px';
       }
@@ -2755,8 +2755,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function sendVolume(vol){
     lastVolumeSentAt = Date.now();
-    if (windowsVolume) window.simplePlayer.volumeSet(Math.round(vol));
-    else if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
+    if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
+    else if (windowsVolume) window.simplePlayer.volumeSet(Math.round(vol));
   }
   onVolumeChange = function(vol){
     volumeTouchedAt = Date.now();

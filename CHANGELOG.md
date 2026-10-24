@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.11 — 23 octobre 2026
+
+- **Tabbar — ordre inversé.** Library à gauche, Player au centre, Search à droite.
+- **Volume corrigé.** La barre de volume contrôle maintenant le volume Spotify (API) en priorité quand connecté, au lieu du volume master Windows. Le fallback Windows reste actif hors connexion Spotify.
+
+## v1.20.10 — 23 octobre 2026
+
+- **Mode idle — bouton + deux fois plus grand.** 312px (était 156px), icône 132px.
+- **Mode idle — titre/artiste rapproché de la pochette.** Le bloc texte descend maintenant directement sous la pochette avec un petit espace, laissant plus de place au bouton + en bas.
+
 ## v1.20.9 — 23 octobre 2026
 
 - **Mode normal — barre de volume décalée 50px vers la gauche.** Le rail de volume (`#volumeRail`) est maintenant à `right:50px` au lieu de `right:0`, et le padding du contenu a été ajusté en conséquence.
