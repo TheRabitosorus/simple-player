@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.37 — 24 octobre 2026
+
+- **Animated Background.** Nouvelle option dans les Settings (visible uniquement si Background est On). Active une animation lente sur le fond flou — zoom et dérive très légers (cycle de 40 s) qui donnent un effet de mouvement d'eau subtil. L'option Animated Background se masque automatiquement si Background est désactivé.
+
+## v1.20.36 — 23 octobre 2026
+
+- **Tick verte basée sur les playlists, pas les Liked Songs.** Au démarrage (après auth), Simple Player parcourt toutes tes playlists et construit un index de tous les morceaux qu'elles contiennent. La tick est verte si le morceau est dans au moins une de tes playlists — indépendamment du cœur Spotify. La vérification est instantanée à chaque changement de morceau. L'index se reconstruit automatiquement après un ajout ou une modification de bibliothèque.
+
 ## v1.20.35 — 23 octobre 2026
 
 - **Molette en idle — barre de volume visible.** La barre de volume idle s'affiche maintenant lors d'un scroll à la molette, exactement comme lors d'un glissement tactile. Elle disparaît automatiquement après 2,5 s sans interaction.

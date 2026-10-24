@@ -59,6 +59,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* -- Player view -- */
 #npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transition:background 1s ease;}
+@keyframes bgDrift{
+  0%  {transform:scale(1.2) translate(0%,0%);}
+  25% {transform:scale(1.25) translate(1.5%,-1%);}
+  50% {transform:scale(1.22) translate(-1%,1.5%);}
+  75% {transform:scale(1.27) translate(-1.5%,-0.5%);}
+  100%{transform:scale(1.2) translate(0%,0%);}
+}
+#npBackground.bg-animated{animation:bgDrift 40s ease-in-out infinite;}
 #swipeZone{position:relative;
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -605,6 +613,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           </div>
         </div>
 
+        <div class="lib-section" id="bgAnimSection">
+          <h3>Animated Background</h3>
+          <p class="settings-desc">Slow drift animation on the background — a subtle water-like movement.</p>
+          <div class="pill-group" id="bgAnimGroup">
+            <button class="pill" data-value="off">Off</button>
+            <button class="pill" data-value="on">On</button>
+          </div>
+        </div>
+
         <div class="lib-section">
           <h3>Startup</h3>
           <p class="settings-desc">Launch Simple Player automatically when Windows starts.</p>
@@ -859,6 +876,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     idleDelay: 5000,
     volZone: 'normal',
     bgEnabled: true,
+    bgAnimated: false,
     startup: false
   };
   var RAIL_PRESETS = {
@@ -971,8 +989,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   var $npBackground = document.getElementById('npBackground');
+  function applyBgAnimation(){
+    $npBackground.classList.toggle('bg-animated', !!(settings.bgEnabled && settings.bgAnimated));
+    // Re-trigger the animation when toggled on so it starts from the keyframe 0.
+    if (settings.bgEnabled && settings.bgAnimated){
+      $npBackground.style.animation = 'none';
+      $npBackground.offsetHeight; // force reflow
+      $npBackground.style.animation = '';
+    }
+  }
   function updateNpBackground(){
-    if (!settings.bgEnabled){ $npBackground.style.background = 'var(--bg)'; return; }
+    if (!settings.bgEnabled){ $npBackground.style.background = 'var(--bg)'; applyBgAnimation(); return; }
     var t = currentTrack(); if (!t) return;
     var seed = t.id + ':' + t.title;
     if (!hueCache[seed]) makeArt(seed);
@@ -980,6 +1007,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBackground.style.background =
       'radial-gradient(120% 70% at 50% -15%, hsla(' + h.hue1 + ',60%,26%,.55), transparent 62%),' +
       'linear-gradient(180deg, hsla(' + h.hue2 + ',45%,16%,.85) 0%, var(--bg) 78%)';
+    applyBgAnimation();
   }
 
   var $playlistBadge = document.getElementById('playlistBadge');
@@ -1589,6 +1617,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         body: JSON.stringify({ uris: [trackUri] })
       }).then(function(){
         addedPlaylistSet.add(trackId);
+        myPlaylistTracksSet.add(trackId); // persist across track changes this session
         if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
         showToast('Ajouté à "' + pl.name + '"');
       }).catch(function(err){
@@ -1620,6 +1649,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
                 body: JSON.stringify({ uris: [trackUri] })
               }).then(function(){
                 addedPlaylistSet.add(trackId);
+                myPlaylistTracksSet.add(trackId);
                 if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
                 showToast('Ajouté à "' + pl.name + '"');
               }).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
@@ -1827,7 +1857,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   wirePillGroup('bgToggleGroup', settings.bgEnabled ? 'on' : 'off', function(v){
     settings.bgEnabled = (v === 'on');
+    document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
     updateNpBackground();
+  });
+  document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
+
+  wirePillGroup('bgAnimGroup', settings.bgAnimated ? 'on' : 'off', function(v){
+    settings.bgAnimated = (v === 'on');
+    // When switching to animated, drop the static inline transform so the
+    // CSS keyframe takes over; restore it when switching back.
+    if (!settings.bgAnimated) $npBackground.style.transform = 'scale(1.2)';
+    applyBgAnimation();
   });
 
   wirePillGroup('startupGroup', settings.startup ? 'on' : 'off', function(v){
@@ -2525,6 +2565,41 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     });
   }
 
+  // Set of all track IDs present in at least one of the user's playlists.
+  // Built in background after auth; updated when a track is added this session.
+  var myPlaylistTracksSet = new Set();
+  var playlistTracksLoaded = false;
+  function buildPlaylistTracksSet(){
+    fetchRealPlaylists().then(function(pls){
+      // Fetch tracks for every playlist in parallel (batches of 5 to stay
+      // within Spotify's rate limits without taking too long).
+      var ids = pls.map(function(p){ return p.id; });
+      function fetchBatch(batch){
+        return Promise.all(batch.map(function(id){
+          function loadPage(offset){
+            return spotifyApi('/playlists/' + id + '/tracks?fields=items(track(id))&limit=100&offset=' + offset)
+              .then(function(r){
+                var items = (r && r.items) || [];
+                items.forEach(function(it){ if (it && it.track && it.track.id) myPlaylistTracksSet.add(it.track.id); });
+                if (r && r.next && items.length && offset < 500) return loadPage(offset + 100);
+              }).catch(function(){}); // ignore 403 on private collab playlists
+          }
+          return loadPage(0);
+        }));
+      }
+      var BATCH = 5;
+      var chain = Promise.resolve();
+      for (var i = 0; i < ids.length; i += BATCH){
+        (function(slice){ chain = chain.then(function(){ return fetchBatch(slice); }); })(ids.slice(i, i + BATCH));
+      }
+      return chain;
+    }).then(function(){
+      playlistTracksLoaded = true;
+      // Re-evaluate the current track's tick now that the set is ready.
+      if (realPlaybackMeta.trackId) updateRealLikedBadge(realPlaybackMeta.trackId);
+    }).catch(function(){});
+  }
+
   var realLikedCache = null;
   function fetchRealLikedTracks(force){
     if (realLikedCache && !force) return Promise.resolve(realLikedCache);
@@ -2609,33 +2684,40 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function invalidateLibraryCache(){
     realLikedCache = null;
     realPlaylistsCache = null;
+    myPlaylistTracksSet = new Set();
+    playlistTracksLoaded = false;
+    buildPlaylistTracksSet();
   }
 
   function updateRealLikedBadge(trackId){
     if (!trackId) return;
-    // If we already know this track was added to a playlist this session,
-    // show the green tick immediately without waiting for the API.
-    if (addedPlaylistSet.has(trackId)){
+    // Immediate green if already known (added this session, or set already built).
+    if (addedPlaylistSet.has(trackId) || myPlaylistTracksSet.has(trackId)){
       $likedBadge.classList.add('on');
       $likedBadge.title = 'In a playlist';
+      updateRealPlaylistBadge(realPlaybackMeta.contextUri);
+      // Still fire the API call to confirm (handles Liked Songs too).
     }
     spotifyApi('/me/tracks/contains?ids=' + trackId).then(function(result){
-      var liked = !!(result && result[0]) || addedPlaylistSet.has(trackId);
+      var inPlaylist = myPlaylistTracksSet.has(trackId) || addedPlaylistSet.has(trackId);
+      var liked = !!(result && result[0]) || inPlaylist;
       $likedBadge.classList.toggle('on', liked);
-      $likedBadge.title = liked ? 'Liked / in a playlist' : 'Not liked';
-      // Now that we know the tick state, update the playlist badge too —
-      // it gates on the tick being green, so it needs to run after this.
+      $likedBadge.title = liked ? (inPlaylist ? 'In a playlist' : 'Liked') : 'Not liked';
       updateRealPlaylistBadge(realPlaybackMeta.contextUri);
     }).catch(function(){});
   }
 
   function updateNpBackgroundReal(artUrl){
-    if (!settings.bgEnabled || !artUrl){ $npBackground.style.background = 'var(--bg)'; $npBackground.style.backgroundImage = 'none'; return; }
+    if (!settings.bgEnabled || !artUrl){ $npBackground.style.background = 'var(--bg)'; $npBackground.style.backgroundImage = 'none'; applyBgAnimation(); return; }
     $npBackground.style.backgroundImage = cssUrl(artUrl);
     $npBackground.style.backgroundSize = 'cover';
     $npBackground.style.backgroundPosition = 'center';
     $npBackground.style.filter = 'blur(60px) brightness(.45)';
-    $npBackground.style.transform = 'scale(1.2)';
+    // transform is now handled by CSS animation when bgAnimated is on;
+    // only set it statically when the animation is off.
+    if (!settings.bgAnimated) $npBackground.style.transform = 'scale(1.2)';
+    else $npBackground.style.transform = '';
+    applyBgAnimation();
   }
 
   var lastKnownTrackId = null;
@@ -2906,6 +2988,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     pollTimer = setInterval(pollPlaybackState, 2000);
     renderLibrary(); // switch Library over from demo data to the real account
     ensureActiveDeviceOrGhost();
+    buildPlaylistTracksSet(); // populate myPlaylistTracksSet in background
   }
 
   // ---------------- "Play on this computer only" ----------------
