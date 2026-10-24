@@ -2,11 +2,15 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.62 — 24 octobre 2026
+
+- **Canvas background clippé.** Ajout de `overflow:hidden` sur `#app` — les blobs canvas ne débordent plus à l'extérieur de la fenêtre du player.
+
 ## v1.20.61 — 24 octobre 2026
 
 - **Zones idle — exactement comme l'image de référence.** La zone jaune (swipe-up pour quitter le mode idle) est maintenant restreinte au-dessous de la pochette : la position de départ du geste (`startYInZone`) doit être plus basse que `_idleArtBottom` (calculé par `fitArtSquare`). Avant, le swipe-up fonctionnait depuis n'importe où dans `#swipeZone`.
 - **Background canvas moins lumineux.** Les blobs canvas étaient trop vifs (teintes jaune/brun). Alpha réduit (0.75→0.45, 0.35→0.18) et assombrissement global renforcé (0.45→0.65). Résultat : fond très discret, ambiance sombre.
-- **Slider volume idle plus long.** Le track vertical en mode idle s'étend maintenant de 5% à 95% de la hauteur de la zone orange (quasi pleine hauteur), au lieu de 15%–85%. Comportement inchangé.
+- **Slider volume idle quasi pleine hauteur.** Le track vertical en mode idle couvre maintenant 15%–85% de la hauteur totale du player (pas de la zone orange). Déplacé comme enfant direct de `#swipeZone` pour que `top/bottom` soient relatifs à la pleine fenêtre. Comportement inchangé.
 
 ## v1.20.60 — 24 octobre 2026
 
