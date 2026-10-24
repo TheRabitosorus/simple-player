@@ -221,7 +221,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{
-  text-align:center;max-width:min(80vw,420px);flex:1 1 auto;
+  text-align:center;max-width:min(80vw,420px);flex:0 0 auto;
   display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;
   transition:max-width var(--morph-dur) var(--morph-ease),
              flex var(--morph-dur) var(--morph-ease),
@@ -644,16 +644,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             <button class="pill" data-value="normal">Normal</button>
             <button class="pill" data-value="large">Large</button>
             <button class="pill" data-value="xlarge">Extra large</button>
-          </div>
-        </div>
-
-        <div class="lib-section">
-          <h3>Interface size</h3>
-          <p class="settings-desc">Makes all text and buttons bigger or smaller. You can also hold Ctrl and scroll (or press Ctrl +/-/0), just like in a Chrome window.</p>
-          <div class="pill-group" id="zoomGroup">
-            <button class="pill" data-value="1.2">Normal</button>
-            <button class="pill" data-value="1.6">Large</button>
-            <button class="pill" data-value="1.9">Extra large</button>
           </div>
         </div>
 
@@ -1131,7 +1121,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (!$artWrap.getClientRects().length) return; // hidden (e.g. a different tab is active)
     var rect = $artWrap.getBoundingClientRect();
     var isIdle = document.getElementById('app').classList.contains('idle');
-    var cap = isIdle ? 560 : 380;
+    var cap = isIdle ? 560 : 520;
     // In idle mode, always leave at least 80px to the right of the cover for
     // the volume strip, even if it means shrinking the art a little.
     var maxW = isIdle ? rect.width - 80 : rect.width;
@@ -1155,7 +1145,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var bottomPad = 16; // breathing room at bottom
       // Max art size that leaves room for badge above + info below
       var maxByHeight = swH - padTop - likedBadgeH - gapBadgeArt - gapArtInfo - infoH - bottomPad;
-      size = Math.max(40, Math.min(size, maxByHeight));
+      // Clamp: never below 60px (still recognisable as art), but always
+      // respect the room needed for badge above + title/artist below.
+      size = Math.max(60, Math.min(size, maxByHeight));
     }
 
     $art.style.width = size + 'px';
@@ -1189,8 +1181,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       idleZone.style.left   = zoneLeft + 'px';
       idleZone.style.right  = '0';
       idleZone.style.width  = '';
-      idleZone.style.top    = artTopInSw2 + 'px';
-      idleZone.style.bottom = (swEl2.offsetHeight - artBotInSw2) + 'px';
+      // Orange zone = full height of swipeZone, right of the cover art.
+      idleZone.style.top    = '0';
+      idleZone.style.bottom = '0';
     }
     // Position the liked badge and + button in idle mode.
     var $lb = document.getElementById('likedBadge');
@@ -1202,18 +1195,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Art top relative to swipeZone:
       var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
       var artBotInSw = artTopInSw + size;
-      // Liked badge: centred in the space above the cover, never overlapping it
+      // Liked badge: centred in the space above the cover, always visible.
+      // The art has already been shrunk (above) to guarantee enough room.
       if ($lb) {
         var badgeH = $lb.getBoundingClientRect().height || 44;
         var spaceAbove = artTopInSw;
-        // If there's not enough room above, pin it at 4px with opacity reduction
-        // so it never sits on top of the art.
-        var badgeTop = spaceAbove >= badgeH + 8
-          ? Math.round(spaceAbove / 2 - badgeH / 2)  // nicely centred
-          : Math.round(Math.max(4, spaceAbove - badgeH - 4)); // pushed up, above art
+        var badgeTop = Math.round(Math.max(4, spaceAbove / 2 - badgeH / 2));
         $lb.style.top = badgeTop + 'px';
-        // Hide badge entirely if it would still overlap the art
-        $lb.style.visibility = (badgeTop + badgeH > artTopInSw - 2) ? 'hidden' : '';
+        $lb.style.visibility = ''; // always visible in idle
       }
       // + button position is handled by CSS (bottom-right corner); clear any
       // leftover inline top that a previous JS pass may have set.
@@ -1616,6 +1605,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     zone.addEventListener('pointerdown', function(e){
       if (!isIdle()) return;
+      // Let taps on the liked badge pass through even though the volume zone
+      // now covers the full height of the swipeZone.
+      if (e.target.closest('#likedBadge')) return;
       // Reveal the bar if not already shown, then start drag immediately —
       // even on the first touch so tap-and-drag works in one gesture.
       if (!app.classList.contains('volume-revealed')){
@@ -2093,42 +2085,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   })();
 
   // ---------------- Interface size (zoom) ----------------
-  // Mirrors Ctrl+scroll / Ctrl +/-/0 in main.js: both drive the same
-  // underlying Chromium zoom factor, so whichever one the user used last
-  // is reflected here, and vice versa.
-  (function(){
-    var group = document.getElementById('zoomGroup');
-    if (!group) return;
-    var buttons = group.querySelectorAll('.pill');
-
-    function highlight(factor){
-      var closest = buttons[0], closestDiff = Infinity;
-      buttons.forEach(function(b){
-        var diff = Math.abs(parseFloat(b.dataset.value) - factor);
-        if (diff < closestDiff){ closestDiff = diff; closest = b; }
-      });
-      buttons.forEach(function(b){ b.classList.toggle('active', b === closest); });
-      fitArtSquare();
-    }
-
-    buttons.forEach(function(btn){
-      btn.addEventListener('click', function(){
-        var factor = parseFloat(btn.dataset.value);
-        if (window.simplePlayer && window.simplePlayer.setZoomFactor) {
-          window.simplePlayer.setZoomFactor(factor).then(highlight);
-        } else {
-          highlight(factor); // preview only: no real zoom available here
-        }
-      });
-    });
-
-    if (window.simplePlayer && window.simplePlayer.getZoomFactor) {
-      window.simplePlayer.getZoomFactor().then(highlight);
-      window.simplePlayer.onZoomChanged(highlight);
-    } else {
-      highlight(1);
-    }
-  })();
+  // Interface size setting removed — the layout now adapts automatically
+  // to the window size. Ctrl+scroll / Ctrl+/-/0 still work via main.js.
 
   // In the real Windows app, read back the actual OS-level setting on
   // launch (it could differ if the user changed it outside Simple Player).

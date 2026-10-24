@@ -188,12 +188,9 @@ function createWindow() {
   mainWindow.on('maximize', () => store.set('windowMaximized', true));
   mainWindow.on('unmaximize', () => store.set('windowMaximized', false));
 
-  // Minimize to tray instead of the taskbar, and keep running when the
-  // window is closed via the X button (only Quit from the tray menu exits).
-  mainWindow.on('minimize', (event) => {
-    event.preventDefault();
-    mainWindow.hide();
-  });
+  // Minimize goes to the taskbar normally.
+  // Keep running when the window is closed via the X button (only Quit from
+  // the tray menu exits).
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       // X button = real quit (pause Spotify + kill Ghost), not hide-to-tray.

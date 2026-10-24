@@ -2,6 +2,39 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.55 — 24 octobre 2026
+
+- **Touches DevTools réactivées.** F12, Ctrl+Shift+I et Ctrl+Shift+J fonctionnent à nouveau (la désactivation de la v1.20.54 était une mauvaise interprétation de la demande).
+- **Fenêtre cmd cachée au lancement.** Ajout de `run.vbs` — lance `run.bat` sans afficher de fenêtre de commande Windows. Double-cliquer sur `run.vbs` au lieu de `run.bat` pour démarrer Simple Player silencieusement.
+
+## v1.20.54 — 24 octobre 2026
+
+- **Console Chromium désactivée.** F12, Ctrl+Shift+I et Ctrl+Shift+J sont maintenant bloqués dans le handler `before-input-event` de `main.js` — la console DevTools ne peut plus s'ouvrir accidentellement pendant l'utilisation normale.
+
+## v1.20.53 — 24 octobre 2026
+
+- **Settings : suppression de l'option "Interface size".** Les trois boutons Normal/Large/Extra large ont été retirés — l'interface s'adapte maintenant automatiquement à la taille de la fenêtre. Ctrl+scroll et Ctrl+/-/0 fonctionnent toujours via main.js pour les besoins ponctuels.
+
+## v1.20.52 — 24 octobre 2026
+
+- **Player normal : pochette plus grande, meilleure lisibilité.** `#trackInfo` passe de `flex:1 1 auto` à `flex:0 0 auto` — il prenait la moitié de l'espace vertical en concurrence avec la pochette. Maintenant `#artWrap` prend tout l'espace disponible, et la pochette est calculée sur cette hauteur réelle. Cap relevé de 380 px à 520 px.
+
+## v1.20.51 — 24 octobre 2026
+
+- **Idle : zones redéfinies selon l'image de référence.**
+  - Zone orange (volume) : s'étend maintenant sur toute la hauteur de `#swipeZone` (top:0, bottom:0), à droite de la pochette. Elle n'était auparavant limitée qu'à la hauteur de la pochette.
+  - Zone bleue (pochette) : inchangée — déjà gérée par `downOnArt` (swipe gauche/droite et play-pause).
+  - Zone jaune (fond) : inchangée — swipe vers le haut ou double-tap pour quitter l'idle.
+  - Tique : un guard dans le handler `pointerdown` de la zone volume laisse passer les taps sur le badge liké, même si la zone volume s'étend maintenant au-dessus de lui.
+
+## v1.20.50 — 24 octobre 2026
+
+- **Fix bouton Réduire.** Le bouton — de la fenêtre réduit maintenant l'application dans la barre des tâches Windows, comme attendu. Auparavant, le handler `minimize` interceptait l'événement et appelait `hide()` (masquer dans le tray), ce qui donnait l'impression que l'app se fermait. Supprimé — Windows gère la minimisation nativement. Le bouton X continue de quitter l'application (comportement inchangé).
+
+## v1.20.49 — 24 octobre 2026
+
+- **Idle : tique toujours visible.** La tique (badge liké) ne disparaît plus jamais — la pochette se réduit autant que nécessaire pour lui laisser la place au-dessus, quelle que soit la taille de la fenêtre. Taille minimale de la pochette abaissée à 60 px pour maximiser l'espace disponible pour les autres éléments.
+
 ## v1.20.48 — 24 octobre 2026
 
 - **Idle : aucun overlap quelle que soit la taille de fenêtre.** `fitArtSquare()` calcule maintenant l'espace vertical disponible dans `#swipeZone` et soustrait la hauteur du badge liké, des gaps flex, de la hauteur naturelle du titre+artiste et une marge basse (16 px) avant de dimensionner la pochette. Résultat : la pochette rétrécit automatiquement si nécessaire pour que titre et artiste tiennent toujours en dessous sans jamais les chevaucher. Le badge liké est masqué (visibility:hidden) s'il ne peut pas tenir au-dessus de la pochette sans se superposer.
