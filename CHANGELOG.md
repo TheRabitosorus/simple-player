@@ -2,6 +2,17 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.35 — 23 octobre 2026
+
+- **Molette en idle — barre de volume visible.** La barre de volume idle s'affiche maintenant lors d'un scroll à la molette, exactement comme lors d'un glissement tactile. Elle disparaît automatiquement après 2,5 s sans interaction.
+
+## v1.20.34 — 23 octobre 2026
+
+- **Recentrage complet (suite v1.20.33).** Trois régressions introduites par la symétrie du padding :
+  - Tick en mode normal : la compensation `left:calc(50% - …)` n'était plus nécessaire avec un padding symétrique — remplacée par `left:50%`.
+  - Tabbar (Search/Player/Library) : le `padding-left:20px` ne compensait plus le padding droit `rail-w + 62px` — les deux côtés sont maintenant égaux.
+  - Mode idle : le override `padding-right:20px` laissait le `padding-left` à `rail-w + 62px`, décalant la pochette et le titre vers la droite — `padding-left:20px` ajouté au override idle.
+
 ## v1.20.33 — 23 octobre 2026
 
 - **Badge playlist conditionnel à la tick.** Le nom de la playlist ne s'affiche plus en haut à gauche si le morceau en cours ne fait partie d'aucune playlist (tick grise). Le badge est désormais lié à l'état de la tick : il n'apparaît que si la tick est verte, et est recalculé après la réponse asynchrone de Spotify.
