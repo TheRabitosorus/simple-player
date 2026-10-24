@@ -72,7 +72,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   75% {transform:scale(1.27) translate(-1.5%,-0.5%);}
   100%{transform:scale(1.2) translate(0%,0%);}
 }
-#npBackground.bg-animated{animation:bgDrift 40s ease-in-out infinite;}
+#npBackground.bg-animated #npBgInner{animation:bgDrift var(--bg-anim-dur,40s) ease-in-out infinite;}
 #swipeZone{position:relative;
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -227,7 +227,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
              flex var(--morph-dur) var(--morph-ease),
              margin var(--morph-dur) var(--morph-ease);
 }
-#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-29px;padding-bottom:0;}
+#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-29px;padding-bottom:0;overflow:hidden;}
 #trackTitle{
   font-family:var(--display-font);font-weight:600;font-style:italic;
   font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
@@ -671,7 +671,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           <p class="settings-desc">Slow drift animation on the background — a subtle water-like movement.</p>
           <div class="pill-group" id="bgAnimGroup">
             <button class="pill" data-value="off">Off</button>
-            <button class="pill" data-value="on">On</button>
+            <button class="pill" data-value="normal">Normal</button>
+            <button class="pill" data-value="medium">Medium</button>
+            <button class="pill" data-value="fast">Fast</button>
           </div>
         </div>
 
@@ -929,7 +931,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     idleDelay: 5000,
     volZone: 'normal',
     bgEnabled: true,
-    bgAnimated: false,
+    bgAnimated: 'off', // 'off' | 'normal' | 'medium' | 'fast'
     startup: false
   };
   var RAIL_PRESETS = {
@@ -1043,15 +1045,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   var $npBackground = document.getElementById('npBackground');
   var $npBgInner    = document.getElementById('npBgInner');
-  var _bgAnimApplied = false;
+  var BG_SPEEDS = { normal: '40s', medium: '20s', fast: '10s' };
+  var _bgAnimApplied = null; // null forces re-apply on first call
   function applyBgAnimation(){
-    var want = !!(settings.bgEnabled && settings.bgAnimated);
-    if (want === _bgAnimApplied) return;
-    _bgAnimApplied = want;
-    // Animation sur le parent (#npBackground, sans filter)
-    $npBackground.classList.toggle('bg-animated', want);
-    // Transform statique sur l'enfant quand pas animé
-    $npBgInner.style.transform = want ? '' : 'scale(1.2)';
+    var speed = settings.bgEnabled ? settings.bgAnimated : 'off';
+    var want = (speed !== 'off');
+    var stateKey = speed; // track speed too, not just on/off
+    if (stateKey === _bgAnimApplied) return;
+    _bgAnimApplied = stateKey;
+    if (want){
+      // Durée via custom property sur l'élément
+      $npBackground.style.setProperty('--bg-anim-dur', BG_SPEEDS[speed] || '40s');
+      $npBackground.classList.add('bg-animated');
+      $npBgInner.style.transform = ''; // laisse l'animation CSS prendre le dessus
+    } else {
+      $npBackground.classList.remove('bg-animated');
+      $npBackground.style.removeProperty('--bg-anim-dur');
+      $npBgInner.style.transform = 'scale(1.2)';
+    }
   }
   function updateNpBackground(){
     if (!settings.bgEnabled){
@@ -1060,6 +1071,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       $npBgInner.style.background = '';
       $npBgInner.style.filter = '';
       $npBgInner.style.transform = '';
+      _bgAnimApplied = null;
       applyBgAnimation();
       return;
     }
@@ -1075,8 +1087,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       'radial-gradient(120% 70% at 50% -15%, hsla(' + h.hue1 + ',60%,26%,.55), transparent 62%),' +
       'linear-gradient(180deg, hsla(' + h.hue2 + ',45%,16%,.85) 0%, var(--bg) 78%)';
     $npBgInner.style.filter = '';
-    var wantAnim = !!(settings.bgEnabled && settings.bgAnimated);
-    $npBgInner.style.transform = wantAnim ? '' : 'scale(1.2)';
+    // Force applyBgAnimation à re-appliquer même si l'état n'a pas changé,
+    // car updateNpBackground peut avoir posé un transform inline entre-temps.
+    _bgAnimApplied = null;
     applyBgAnimation();
   }
 
@@ -1113,6 +1126,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // explicit pixel value — so the two are always exactly equal by
   // construction, no matter what else on screen changes.
   var $artWrap = document.getElementById('artWrap');
+  var $trackInfo = document.getElementById('trackInfo');
   function fitArtSquare(){
     if (!$artWrap.getClientRects().length) return; // hidden (e.g. a different tab is active)
     var rect = $artWrap.getBoundingClientRect();
@@ -1122,6 +1136,28 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // the volume strip, even if it means shrinking the art a little.
     var maxW = isIdle ? rect.width - 80 : rect.width;
     var size = Math.max(40, Math.min(cap, maxW, rect.height));
+
+    if (isIdle) {
+      // Reserve space for title+artist below the art so they never overlap.
+      // Temporarily remove max-height constraint to measure natural height,
+      // then work out how much vertical space remains for the art.
+      $trackInfo.style.maxHeight = '';
+      var swEl0 = $artWrap.parentElement; // #swipeZone
+      var swH   = swEl0.getBoundingClientRect().height;
+      // padding-top:20px is applied in idle CSS on #swipeZone
+      var padTop = 20;
+      var likedBadgeH = 52; // approx height of enlarged tick icon (44px svg + margin)
+      var gapBadgeArt = 8;  // flex gap between elements (clamp lower bound)
+      var gapArtInfo  = 8;  // gap between art and trackInfo (flex gap)
+      // Natural height of trackInfo (big font-size in idle)
+      var infoH = $trackInfo.getBoundingClientRect().height;
+      if (!infoH) infoH = 90; // fallback before first paint
+      var bottomPad = 16; // breathing room at bottom
+      // Max art size that leaves room for badge above + info below
+      var maxByHeight = swH - padTop - likedBadgeH - gapBadgeArt - gapArtInfo - infoH - bottomPad;
+      size = Math.max(40, Math.min(size, maxByHeight));
+    }
+
     $art.style.width = size + 'px';
     $art.style.height = size + 'px';
     // The idle-mode volume reveal zone is a strip against the window's right
@@ -1130,29 +1166,25 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // entry/exit, resize, zoom, tab switches all already call this).
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
-      // The activation zone covers only the gap between the RIGHT edge of the
-      // cover art and the right edge of the window — never overlapping the art.
-      // We compute everything in #swipeZone's own coordinate space (offsetLeft/
-      // offsetTop relative to its offsetParent) to avoid getBoundingClientRect()
-      // being distorted by any active CSS transform on #swipeZone itself.
+      // idleVolumeZone is position:absolute inside #swipeZone.
+      // We need its bounds in swipeZone's local coordinate space.
+      // getBoundingClientRect() is distorted when #swipeZone has an active
+      // CSS transform (morph animation). To cancel that distortion, we
+      // temporarily clear the inline transform, read the rects, then restore.
       var swEl2 = $artWrap.closest('#swipeZone') || document.body;
-      // Art centre in swipeZone local coords (offsetLeft/Top give the art's
-      // top-left relative to its offsetParent, which is #swipeZone).
-      // We know the art is square with side `size`, so:
-      var artOffLeft = $art.offsetLeft;  // relative to #swipeZone
-      var artOffTop  = $art.offsetTop;   // relative to #swipeZone (via artWrap)
-      // artWrap may be the offsetParent of $art; walk up to swipeZone.
-      var el = $art;
-      var localLeft = 0, localTop = 0;
-      while (el && el !== swEl2) {
-        localLeft += el.offsetLeft;
-        localTop  += el.offsetTop;
-        el = el.offsetParent;
-      }
-      var artRightInSw = localLeft + size;   // right edge of art in swipeZone coords
-      var artTopInSw2  = localTop;
-      var artBotInSw2  = localTop + size;
-      // Add a hard 12 px gap so the zone never kisses the art edge.
+      var savedTransform = swEl2.style.transform;
+      swEl2.style.transform = 'none';
+      void swEl2.offsetWidth; // force sync layout with transform cleared
+      var artR  = $art.getBoundingClientRect();
+      var swR   = swEl2.getBoundingClientRect();
+      swEl2.style.transform = savedTransform; // restore immediately
+
+      // Convert to swipeZone-local coords.
+      var artRightInSw = Math.round(artR.right  - swR.left);
+      var artTopInSw2  = Math.round(artR.top    - swR.top);
+      var artBotInSw2  = Math.round(artR.bottom - swR.top);
+
+      // Hard 12 px gap: zone NEVER starts before right edge of art.
       var zoneLeft = artRightInSw + 12;
       idleZone.style.left   = zoneLeft + 'px';
       idleZone.style.right  = '0';
@@ -1170,10 +1202,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Art top relative to swipeZone:
       var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
       var artBotInSw = artTopInSw + size;
-      // Liked badge: exactly halfway between the window top and the cover top
+      // Liked badge: centred in the space above the cover, never overlapping it
       if ($lb) {
         var badgeH = $lb.getBoundingClientRect().height || 44;
-        $lb.style.top = Math.round(Math.max(4, artTopInSw / 2 - badgeH / 2)) + 'px';
+        var spaceAbove = artTopInSw;
+        // If there's not enough room above, pin it at 4px with opacity reduction
+        // so it never sits on top of the art.
+        var badgeTop = spaceAbove >= badgeH + 8
+          ? Math.round(spaceAbove / 2 - badgeH / 2)  // nicely centred
+          : Math.round(Math.max(4, spaceAbove - badgeH - 4)); // pushed up, above art
+        $lb.style.top = badgeTop + 'px';
+        // Hide badge entirely if it would still overlap the art
+        $lb.style.visibility = (badgeTop + badgeH > artTopInSw - 2) ? 'hidden' : '';
       }
       // + button position is handled by CSS (bottom-right corner); clear any
       // leftover inline top that a previous JS pass may have set.
@@ -1881,11 +1921,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       app.classList.add(cls);
       setTimeout(function(){ app.classList.remove(cls); }, 380);
     }
+    var MORPH_MS = 620; // slightly over --morph-dur (600ms) so layout is settled
     function clear(){
       triggerIdleAnim('idle-leave');
       app.classList.remove('idle');
       if (timer){ clearTimeout(timer); timer = null; }
-      fitArtSquare();
+      fitArtSquare(); // immediate pass for size
+      setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
     }
     function schedule(){
       if (timer) clearTimeout(timer);
@@ -1893,7 +1935,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (isPlayerActive()){
           triggerIdleAnim('idle-enter');
           app.classList.add('idle');
-          fitArtSquare();
+          fitArtSquare(); // immediate pass for size
+          setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
         }
       }, settings.idleDelay);
     }
@@ -1956,8 +1999,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   });
   document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
 
-  wirePillGroup('bgAnimGroup', settings.bgAnimated ? 'on' : 'off', function(v){
-    settings.bgAnimated = (v === 'on');
+  wirePillGroup('bgAnimGroup', settings.bgAnimated || 'off', function(v){
+    settings.bgAnimated = v; // 'off' | 'normal' | 'medium' | 'fast'
+    _bgAnimApplied = null; // force re-apply even if same on/off state
     applyBgAnimation();
   });
 
@@ -2805,6 +2849,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       $npBackground.style.background = 'var(--bg)';
       $npBgInner.style.backgroundImage = 'none';
       $npBgInner.style.filter = '';
+      _bgAnimApplied = null;
       applyBgAnimation();
       return;
     }
@@ -2815,11 +2860,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBgInner.style.backgroundSize = 'cover';
     $npBgInner.style.backgroundPosition = 'center';
     $npBgInner.style.filter = 'blur(60px) brightness(.45)';
-    // Ne pas poser scale(1.2) sur l'inner si l'animation est active :
-    // applyBgAnimation() va le vider. Si le guard l'empêche (déjà applied),
-    // on le vide manuellement pour ne pas contrecarrer l'animation du parent.
-    var wantAnim = !!(settings.bgEnabled && settings.bgAnimated);
-    $npBgInner.style.transform = wantAnim ? '' : 'scale(1.2)';
+    // Force applyBgAnimation à re-appliquer même si l'état n'a pas changé,
+    // car setBackgroundFromUrl peut avoir posé un transform inline entre-temps.
+    _bgAnimApplied = null;
     applyBgAnimation();
   }
 

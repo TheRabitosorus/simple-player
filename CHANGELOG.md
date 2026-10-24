@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.48 — 24 octobre 2026
+
+- **Idle : aucun overlap quelle que soit la taille de fenêtre.** `fitArtSquare()` calcule maintenant l'espace vertical disponible dans `#swipeZone` et soustrait la hauteur du badge liké, des gaps flex, de la hauteur naturelle du titre+artiste et une marge basse (16 px) avant de dimensionner la pochette. Résultat : la pochette rétrécit automatiquement si nécessaire pour que titre et artiste tiennent toujours en dessous sans jamais les chevaucher. Le badge liké est masqué (visibility:hidden) s'il ne peut pas tenir au-dessus de la pochette sans se superposer.
+
+## v1.20.47 — 24 octobre 2026
+
+- **Fix définitif animation de fond.** L'animation `bgDrift` était appliquée sur `#npBackground` (le conteneur), mais c'est `#npBgInner` qui porte l'image et le `transform:scale(1.2)` inline — ce scale inline écrasait silencieusement l'animation du parent, rendant le fond statique. Correction : le sélecteur CSS est maintenant `#npBackground.bg-animated #npBgInner`, et `applyBgAnimation()` vide le transform inline dès que l'animation est active. `_bgAnimApplied` est réinitialisé à chaque changement de piste pour éviter que le guard bloque la re-application.
+- **Choix de vitesse d'animation de fond.** Dans les réglages, le bouton On/Off est remplacé par trois vitesses : Normal (40 s), Medium (20 s), Fast (10 s). La vitesse est injectée via la custom property CSS `--bg-anim-dur` directement sur l'élément.
+- **Réajustement des zones après morph idle↔normal.** `fitArtSquare()` est désormais appelé deux fois lors de chaque transition : immédiatement (pour le redimensionnement de la pochette) et 620 ms plus tard (après la fin du morph à 600 ms, pour que les positions des zones reflètent le layout définitivement stabilisé). Cela corrige le désalignement de la zone volume et de la zone swipe visible dans le debug overlay après un changement de mode.
+
 ## v1.20.46 — 24 octobre 2026
 
 - **Debug zones d'activation (Ctrl+Shift+D).** En mode idle, appuyer sur Ctrl+Shift+D superpose des calques colorés semi-transparents sur chaque zone d'activation : pochette (bleu), zone volume (orange), zone swipe (vert), badge liké (rose), bouton + (jaune). Chaque calque affiche son nom et ses dimensions en pixels. Re-appuyer sur Ctrl+Shift+D retire les calques. Les calques se rafraîchissent automatiquement au redimensionnement de la fenêtre.
