@@ -77,7 +77,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Mode immersif (3s sans interaction) ---------- */
 /* Reste visible : tique "liké", pastille playlist, titre + artiste. Le reste s'efface. */
-#tabbar{transition:opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;max-height:80px;overflow:hidden;}
+#tabbar{transition:opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;max-height:160px;overflow:hidden;}
 #progressWrap,#transport{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;overflow:hidden;}
 #addToLibraryWrap{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;}
 #app.idle #addToLibraryWrap{overflow:hidden;}
@@ -102,6 +102,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;}
 /* The idle-mode volume bar lives INSIDE #idleVolumeZone, centred in the strip. */
+#idleVolIcon{position:absolute;top:-38px;left:50%;transform:translateX(-50%);width:28px;height:28px;color:var(--fg-dim);}
+#idleVolIcon svg{width:100%;height:100%;}
 #idleVolBar{position:absolute;width:5px;top:15%;bottom:15%;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
 #app.idle.volume-revealed #idleVolBar{opacity:1;}
 #idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;background:var(--accent);}
@@ -207,13 +209,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    above gives it a display value (the collapsed Liked Songs list used to show). */
 [hidden]{display:none !important;}
 .track-list{display:flex;flex-direction:column;gap:2px;}
-.track-row{display:flex;align-items:center;gap:12px;padding:9px 8px;border-radius:10px;}
+.track-row{display:flex;align-items:center;gap:20px;padding:12px 6px;border-radius:12px;}
 .track-row:hover{background:var(--bg-elev);}
-.track-row .thumb{width:46px;height:46px;border-radius:7px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
+.track-row .thumb{width:116px;height:116px;border-radius:10px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);}
 .track-row .meta{min-width:0;flex:1 1 auto;}
-.track-row .ttl{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.track-row .sub{font-size:12px;color:var(--fg-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.track-row .dur{font-family:var(--mono-font);font-size:11px;color:var(--fg-faint);flex:0 0 auto;font-variant-numeric:tabular-nums;}
+.track-row .ttl{font-size:22px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.track-row .sub{font-size:17px;color:var(--fg-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;}
+.track-row .dur{font-family:var(--mono-font);font-size:15px;color:var(--fg-faint);flex:0 0 auto;font-variant-numeric:tabular-nums;}
 .track-row.playing .ttl{color:var(--accent);}
 
 .playlist-grid.as-list{display:flex;flex-direction:column;gap:2px;}
@@ -362,15 +364,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
   right:calc(var(--rail-w)/2 - 22px + max(10px, env(safe-area-inset-right,0px)));
-  width:44px;height:44px;border-radius:50%;
+  width:64px;height:64px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   color:var(--fg-faint);transition:background .12s,color .12s,right .25s ease;
 }
 .tabbar-gear:hover{background:var(--bg-elev-2);color:var(--fg);}
-.tabbar-gear svg{width:21px;height:21px;}
-.tab{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--fg-faint);padding:4px 10px;border-radius:10px;min-width:64px;}
-.tab svg{width:21px;height:21px;}
-.tab span{font-size:10px;font-weight:700;letter-spacing:.2px;}
+.tabbar-gear svg{width:48px;height:48px;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--fg-faint);padding:6px 10px;border-radius:14px;min-width:80px;}
+.tab svg{width:48px;height:48px;}
+.tab span{font-size:18px;font-weight:700;letter-spacing:.2px;}
 .tab.active{color:var(--accent);}
 
 /* scrollbar */
@@ -453,6 +455,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
            visible rail's own controls handle things as usual. -->
       <div id="idleVolumeZone">
         <div id="idleVolBar" aria-hidden="true">
+          <div id="idleVolIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></div>
           <div id="idleVolFill"></div>
           <div id="idleVolThumb"></div>
           <span id="idleVolLabel"></span>
@@ -833,6 +836,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // controls (idle zone and normal-mode rail) so they behave identically.
   var VOLUME_DRAG_PX = 700;
   var updateVolumeDisplay = null; // set by the volume rail; also used by the swipe-to-adjust-volume gesture
+  // Speaker icon SVG paths — shared between the normal rail and the idle bar.
+  var VOL_ICON_SPEAKER = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
+  var VOL_ICON_WAVE_S = '<path d="M15.3 10.3a2.2 2.2 0 0 1 0 3.4"/>';
+  var VOL_ICON_WAVE_M = '<path d="M16.8 8.8a4 4 0 0 1 0 6.4"/>';
+  var VOL_ICON_WAVE_L = '<path d="M18.3 7a6 6 0 0 1 0 10"/>';
+  var VOL_ICONS_MAP = {
+    mute: VOL_ICON_SPEAKER + '<path d="m16 9 5 6M21 9l-5 6"/>',
+    1: VOL_ICON_SPEAKER + VOL_ICON_WAVE_S,
+    2: VOL_ICON_SPEAKER + VOL_ICON_WAVE_S + VOL_ICON_WAVE_M,
+    3: VOL_ICON_SPEAKER + VOL_ICON_WAVE_S + VOL_ICON_WAVE_M + VOL_ICON_WAVE_L
+  };
 
   // ---------------- DOM refs ----------------
   var $art = document.getElementById('art');
@@ -1301,6 +1315,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var iFill = document.getElementById('idleVolFill');
     var iThumb = document.getElementById('idleVolThumb');
     var iLabel = document.getElementById('idleVolLabel');
+    var iIcon = document.getElementById('idleVolIcon');
 
     function isIdle(){ return app.classList.contains('idle'); }
 
@@ -1310,6 +1325,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       iFill.style.height = pct + '%';
       if (iThumb) iThumb.style.bottom = pct + '%';
       if (iLabel) iLabel.textContent = Math.round(pct) + '%';
+      if (iIcon) {
+        var level = pct === 0 ? 'mute' : (pct <= 33 ? 1 : (pct <= 66 ? 2 : 3));
+        var svg = iIcon.querySelector('svg');
+        if (svg) svg.innerHTML = VOL_ICONS_MAP[level];
+      }
     }
 
     function scheduleHide(){
@@ -1365,22 +1385,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var volIcon = document.getElementById('volIcon');
     var lastVolume = state.volume;
 
-    var SPEAKER = '<path d="M4 9v6h4l5 4V5L8 9H4z"/>';
-    var WAVE_SMALL = '<path d="M15.3 10.3a2.2 2.2 0 0 1 0 3.4"/>';
-    var WAVE_MED = '<path d="M16.8 8.8a4 4 0 0 1 0 6.4"/>';
-    var WAVE_LARGE = '<path d="M18.3 7a6 6 0 0 1 0 10"/>';
-    var VOL_ICONS = {
-      mute: SPEAKER + '<path d="m16 9 5 6M21 9l-5 6"/>',
-      1: SPEAKER + WAVE_SMALL,
-      2: SPEAKER + WAVE_SMALL + WAVE_MED,
-      3: SPEAKER + WAVE_SMALL + WAVE_MED + WAVE_LARGE
-    };
     function render(){
       fill.style.height = state.volume + '%';
       thumb.style.bottom = state.volume + '%';
       label.textContent = Math.round(state.volume) + '%';
       var level = state.volume === 0 ? 'mute' : (state.volume <= 33 ? 1 : (state.volume <= 66 ? 2 : 3));
-      volIcon.innerHTML = VOL_ICONS[level];
+      volIcon.innerHTML = VOL_ICONS_MAP[level];
     }
     // Same behaviour as the idle-mode volume zone: touching does NOT jump
     // the volume; dragging up/down moves it relative to where it was when

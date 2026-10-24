@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.19.7 — 23 octobre 2026
+
+- **Icônes de la barre du bas trois fois plus grandes.** Icônes 48 px (étaient 21 px), labels 18 px (étaient 10 px). Inclut l'icône Settings.
+
+## v1.19.6 — 23 octobre 2026
+
+- **Icône haut-parleur dans la barre volume idle.** L'icône apparaît au-dessus de la barre et réagit au niveau (muet / 1 onde / 2 ondes / 3 ondes), identique au player normal.
+- **Résultats de recherche deux fois plus grands.** Pochettes 116 px, titre 22 px, sous-titre 17 px — même taille que la bibliothèque.
+- **Correction bug volume idle.** Les constantes SVG du haut-parleur sont maintenant globales, accessibles par les deux zones de volume.
+
 ## v1.19.5 — 23 octobre 2026
 
 - **Textes deux fois plus grands.** Compteur de temps (élapsé / total) : 28 px au lieu de 14 px. Pourcentage de volume en idle : 24 px au lieu de 12 px.
