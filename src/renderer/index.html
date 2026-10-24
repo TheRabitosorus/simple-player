@@ -1159,29 +1159,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
       // idleVolumeZone is position:absolute inside #swipeZone.
-      // We need its bounds in swipeZone's local coordinate space.
-      // getBoundingClientRect() is distorted when #swipeZone has an active
-      // CSS transform (morph animation). To cancel that distortion, we
-      // temporarily clear the inline transform, read the rects, then restore.
-      var swEl2 = $artWrap.closest('#swipeZone') || document.body;
-      var savedTransform = swEl2.style.transform;
-      swEl2.style.transform = 'none';
-      void swEl2.offsetWidth; // force sync layout with transform cleared
-      var artR  = $art.getBoundingClientRect();
-      var swR   = swEl2.getBoundingClientRect();
-      swEl2.style.transform = savedTransform; // restore immediately
+      // Use offsetLeft/offsetWidth — these are already in swipeZone's local
+      // coordinate space and are not affected by CSS transforms on swipeZone.
+      // #artWrap is centred inside swipeZone; #art is centred inside #artWrap.
+      var artWrapLeft = $artWrap.offsetLeft;
+      var artWrapW    = $artWrap.offsetWidth;
+      var artLeft     = Math.round(artWrapLeft + (artWrapW - size) / 2);
+      var artRight    = artLeft + size;
 
-      // Convert to swipeZone-local coords.
-      var artRightInSw = Math.round(artR.right  - swR.left);
-      var artTopInSw2  = Math.round(artR.top    - swR.top);
-      var artBotInSw2  = Math.round(artR.bottom - swR.top);
-
-      // Hard 12 px gap: zone NEVER starts before right edge of art.
-      var zoneLeft = artRightInSw + 12;
-      idleZone.style.left   = zoneLeft + 'px';
+      // Orange zone: full height, starts flush at the right edge of the cover.
+      idleZone.style.left   = artRight + 'px';
       idleZone.style.right  = '0';
       idleZone.style.width  = '';
-      // Orange zone = full height of swipeZone, right of the cover art.
       idleZone.style.top    = '0';
       idleZone.style.bottom = '0';
     }

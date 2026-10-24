@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.56 — 24 octobre 2026
+
+- **Idle : zone volume repositionnée correctement.** L'ancienne méthode (`getBoundingClientRect` avec transform temporairement effacé) donnait des coordonnées erronées à cause du padding de `#swipeZone`. Remplacé par `offsetLeft`/`offsetWidth` qui opèrent directement dans le système de coordonnées local de swipeZone, sans être affectés par les transforms CSS. La zone orange démarre maintenant exactement au bord droit de la pochette.
+
 ## v1.20.55 — 24 octobre 2026
 
 - **Touches DevTools réactivées.** F12, Ctrl+Shift+I et Ctrl+Shift+J fonctionnent à nouveau (la désactivation de la v1.20.54 était une mauvaise interprétation de la demande).
