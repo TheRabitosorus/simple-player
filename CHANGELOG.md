@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.33 — 23 octobre 2026
+
+- **Badge playlist conditionnel à la tick.** Le nom de la playlist ne s'affiche plus en haut à gauche si le morceau en cours ne fait partie d'aucune playlist (tick grise). Le badge est désormais lié à l'état de la tick : il n'apparaît que si la tick est verte, et est recalculé après la réponse asynchrone de Spotify.
+- **Recentrage du contenu en mode normal.** La pochette, le titre, la barre de temps, les boutons de lecture, la tick et la tabbar étaient décalés vers la gauche à cause d'un padding asymétrique sur `#swipeZone` (20 px à gauche contre `rail-w + 62 px` à droite). Le padding gauche est maintenant égal au padding droit pour remettre tout le groupe visuellement au centre.
+- **Fond assombri persistant après ajout à une playlist (fix définitif).** Le backdrop et le menu d'ajout à une playlist étaient des descendants de `#swipeZone`, dont la propriété `transition: transform` crée un nouveau bloc contenant CSS pendant les animations — les enfants `position:fixed` se retrouvaient confinés à cette zone. Backdrop et menu sont maintenant déplacés vers `document.body` au démarrage, garantissant qu'ils couvrent bien tout le viewport et disparaissent correctement après un ajout.
+
+## v1.20.31 — 23 octobre 2026
+
+- **Molette — correction du fix v1.20.29.** Le filtre anti-scroll bloquait aussi la molette dans le player (normal et idle), car `#view-player` a lui aussi la classe `.view`. La molette change maintenant le volume dans le player (normal et idle) et scrolle normalement dans Settings, Library et Search.
+
 ## v1.20.30 — 23 octobre 2026
 
 - **Tick verte après ajout à une playlist.** Après avoir ajouté un morceau à une playlist (en mode normal ou idle), la tick passe immédiatement au vert sans attendre le prochain changement de piste. L'état était perdu parce que `updateLikedBadge` (mode démo) était appelée au lieu de `updateRealLikedBadge`.

@@ -63,7 +63,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:clamp(14px,3vh,28px);
-  padding:36px calc(var(--rail-w) + 62px) 16px 20px;
+  padding:36px calc(var(--rail-w) + 62px) 16px calc(var(--rail-w) + 62px);
   transition:padding .25s ease;
   /* We handle both the horizontal (track swipe) and vertical (volume)
      drag entirely in JS — touch-action:pan-y was telling the browser to
@@ -488,7 +488,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         </div>
       </div>
 
-      <div id="addBackdrop" hidden></div>
       <div id="toast" hidden></div>
 
       <aside id="volumeRail">
@@ -887,13 +886,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var onVolumeChange = null; // wired to the Windows volume (or Spotify's) below
 
   // Mouse wheel on the window adjusts volume (5% per notch).
-  // Disabled when the Settings (or Library / Search) view is open so the
+  // Disabled when the Settings, Library or Search view is active so the
   // wheel can scroll those lists normally.
   window.addEventListener('wheel', function(e){
     if (!onVolumeChange) return;
-    // If the scroll target is inside a scrollable view (settings, library,
+    // If the scroll target is inside a non-player view (settings, library,
     // search), let the browser handle it — don't steal it for volume.
-    if (e.target && e.target.closest && e.target.closest('.view')) return;
+    var closestView = e.target && e.target.closest && e.target.closest('.view');
+    if (closestView && closestView.id !== 'view-player') return;
     e.preventDefault();
     var delta = e.deltaY > 0 ? -5 : 5; // scroll down = lower, scroll up = raise
     state.volume = Math.max(0, Math.min(100, state.volume + delta));
@@ -1541,14 +1541,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   (function(){
     var addBtn = document.getElementById('addBtn');
     var menu = document.getElementById('addMenu');
-    var backdrop = document.getElementById('addBackdrop');
+    // Backdrop and menu both live on document.body so position:fixed/absolute
+    // always covers the full viewport — never clipped by a parent with
+    // transform, display:none or overflow:hidden.
+    var backdrop = document.createElement('div');
+    backdrop.id = 'addBackdrop';
+    backdrop.hidden = true;
+    document.body.appendChild(backdrop);
+    // Move the menu to body too (was inside #addToLibraryWrap which can be
+    // display:none in idle and has an animated transform ancestor).
+    document.body.appendChild(menu);
 
     function closeMenu(){
       menu.hidden = true;
       menu.classList.remove('idle-menu');
-      // Return menu to its original parent if it was moved to body in idle mode
-      var wrap = document.getElementById('addToLibraryWrap');
-      if (menu.parentElement !== wrap) wrap.appendChild(menu);
       backdrop.hidden = true;
       addBtn.setAttribute('aria-expanded', 'false');
     }
@@ -1676,16 +1682,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     addBtn.addEventListener('click', function(){
       if (!menu.hidden){ closeMenu(); return; }
       buildMenu();
-      // In idle mode the wrap is positioned deep in the DOM and can be
-      // clipped — move the menu to document.body so it's always on top.
+      // Menu is always in document.body; just toggle idle-menu for positioning.
       var isIdleNow = document.getElementById('app').classList.contains('idle');
-      if (isIdleNow) {
-        if (menu.parentElement !== document.body) document.body.appendChild(menu);
-        menu.classList.add('idle-menu');
+      menu.classList.toggle('idle-menu', isIdleNow);
+      if (!isIdleNow){
+        // In normal mode: anchor the menu above the + button.
+        var btnRect = addBtn.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.bottom = (window.innerHeight - btnRect.top + 10) + 'px';
+        menu.style.left = '50%';
+        menu.style.transform = 'translateX(-50%)';
+        menu.style.top = '';
       } else {
-        var wrap = document.getElementById('addToLibraryWrap');
-        if (menu.parentElement !== wrap) wrap.appendChild(menu);
-        menu.classList.remove('idle-menu');
+        menu.style.position = '';
+        menu.style.bottom = '';
+        menu.style.left = '';
+        menu.style.top = '';
+        menu.style.transform = '';
       }
       menu.hidden = false;
       backdrop.hidden = false;
@@ -1702,8 +1715,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (!isIdleNow) return; // normal mode: + button handles it
         if (!menu.hidden){ closeMenu(); return; }
         buildMenu();
-        if (menu.parentElement !== document.body) document.body.appendChild(menu);
         menu.classList.add('idle-menu');
+        menu.style.position = '';
+        menu.style.bottom = '';
+        menu.style.left = '';
+        menu.style.top = '';
+        menu.style.transform = '';
         menu.hidden = false;
         backdrop.hidden = false;
       });
@@ -2405,8 +2422,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function updateRealPlaylistBadge(contextUri){
+    // Only show the playlist name if the track is in one of the user's
+    // playlists (tick is green). A non-liked track played from someone else's
+    // playlist or an album context should not display a playlist name.
+    var tickOn = $likedBadge.classList.contains('on');
     var m = contextUri && /spotify:playlist:([A-Za-z0-9]+)/.exec(contextUri);
-    if (!m){ $playlistBadge.hidden = true; return; }
+    if (!m || !tickOn){ $playlistBadge.hidden = true; return; }
     var id = m[1];
     if (playlistNameCache[id]){
       $playlistBadge.textContent = playlistNameCache[id];
@@ -2416,6 +2437,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $playlistBadge.hidden = true;
     spotifyApi('/playlists/' + id + '?fields=name').then(function(data){
       if (!data) return;
+      // Re-check tick after async fetch — user may have changed tracks.
+      if (!$likedBadge.classList.contains('on')) return;
       playlistNameCache[id] = data.name;
       $playlistBadge.textContent = data.name;
       $playlistBadge.hidden = false;
@@ -2583,6 +2606,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var liked = !!(result && result[0]) || addedPlaylistSet.has(trackId);
       $likedBadge.classList.toggle('on', liked);
       $likedBadge.title = liked ? 'Liked / in a playlist' : 'Not liked';
+      // Now that we know the tick state, update the playlist badge too —
+      // it gates on the tick being green, so it needs to run after this.
+      updateRealPlaylistBadge(realPlaybackMeta.contextUri);
     }).catch(function(){});
   }
 
