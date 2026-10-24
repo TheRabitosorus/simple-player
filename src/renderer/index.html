@@ -61,7 +61,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* #npBackground = couche transform (animation dérive)
    #npBgInner    = couche filter blur — séparées pour que Chromium
                    n'annule pas l'animation quand filter est présent */
-#npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transition:background 1s ease;transform-origin:center center;}
+#npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transform-origin:center center;overflow:hidden;}
 #npBgInner{position:absolute;inset:0;background-size:cover;background-position:center;transform-origin:center center;}
 @keyframes bgDrift{
   0%  {transform:scale(1.2) translate(0%,0%);}
@@ -1005,14 +1005,29 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBgInner.style.transform = want ? '' : 'scale(1.2)';
   }
   function updateNpBackground(){
-    if (!settings.bgEnabled){ $npBackground.style.background = 'var(--bg)'; $npBgInner.style.backgroundImage = 'none'; $npBgInner.style.filter = ''; applyBgAnimation(); return; }
+    if (!settings.bgEnabled){
+      $npBackground.style.background = 'var(--bg)';
+      $npBgInner.style.backgroundImage = 'none';
+      $npBgInner.style.background = '';
+      $npBgInner.style.filter = '';
+      $npBgInner.style.transform = '';
+      applyBgAnimation();
+      return;
+    }
     var t = currentTrack(); if (!t) return;
     var seed = t.id + ':' + t.title;
     if (!hueCache[seed]) makeArt(seed);
     var h = hueCache[seed];
-    $npBackground.style.background =
+    // Gradient sur l'inner (avec scale de base) ; parent transparent pour l'animation.
+    // Même architecture que le mode réel : parent = transform/animation, inner = contenu visuel.
+    $npBackground.style.background = 'none';
+    $npBgInner.style.backgroundImage = 'none';
+    $npBgInner.style.background =
       'radial-gradient(120% 70% at 50% -15%, hsla(' + h.hue1 + ',60%,26%,.55), transparent 62%),' +
       'linear-gradient(180deg, hsla(' + h.hue2 + ',45%,16%,.85) 0%, var(--bg) 78%)';
+    $npBgInner.style.filter = '';
+    var wantAnim = !!(settings.bgEnabled && settings.bgAnimated);
+    $npBgInner.style.transform = wantAnim ? '' : 'scale(1.2)';
     applyBgAnimation();
   }
 
@@ -2729,7 +2744,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBgInner.style.backgroundSize = 'cover';
     $npBgInner.style.backgroundPosition = 'center';
     $npBgInner.style.filter = 'blur(60px) brightness(.45)';
-    $npBgInner.style.transform = 'scale(1.2)'; // toujours scale sur l'inner (compense le inset:0)
+    // Ne pas poser scale(1.2) sur l'inner si l'animation est active :
+    // applyBgAnimation() va le vider. Si le guard l'empêche (déjà applied),
+    // on le vide manuellement pour ne pas contrecarrer l'animation du parent.
+    var wantAnim = !!(settings.bgEnabled && settings.bgAnimated);
+    $npBgInner.style.transform = wantAnim ? '' : 'scale(1.2)';
     applyBgAnimation();
   }
 

@@ -2,6 +2,18 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.42 — 24 octobre 2026
+
+- **Revert DPI scaling (v1.20.40).** L'ajustement automatique de taille et de zoom selon le `scaleFactor` Windows a été entièrement supprimé de `main.js`. Une analyse vidéo a confirmé qu'il provoquait une superposition de calques (double titre, pochette coupée, contrôles écrasés) lors du déplacement de la fenêtre et du passage idle↔player. L'interface retrouve son comportement stable d'avant la v1.20.40 ; l'utilisateur peut ajuster le zoom manuellement via Ctrl+scroll.
+
+## v1.20.41 — 24 octobre 2026
+
+- **Animated Background — fix définitif (tentative 3).** Trois causes résiduelles corrigées :
+  1. `transition:background 1s ease` sur `#npBackground` forçait un compositing layer qui bloquait l'animation `transform` (supprimé).
+  2. `$npBgInner.style.transform = 'scale(1.2)'` était posé juste avant `applyBgAnimation()` — le guard `_bgAnimApplied` empêchait le vidage, laissant le scale inline contrecarrer l'animation du parent. Corrigé : le scale est vidé manuellement si l'animation est voulue.
+  3. En mode fictif (démo), le gradient était appliqué directement sur `#npBackground` au lieu de `#npBgInner` — l'animation agrandissait un fond déjà à taille normale et les bords noirs apparaissaient. Corrigé : même architecture que le mode réel (contenu visuel sur l'inner, animation sur le parent).
+  4. Ajout `overflow:hidden` sur `#npBackground` pour éviter toute fuite visuelle lors du scale.
+
 ## v1.20.40 — 24 octobre 2026
 
 - **Mise à l'échelle Windows (DPI scaling).** À 175 % (ou tout autre scaling > 100 %), la fenêtre et le zoom s'adaptent automatiquement au premier lancement. La taille par défaut (480×760) est divisée par le `scaleFactor` de l'écran principal, et le zoom par défaut (1.6) est réduit proportionnellement, afin que l'interface garde les mêmes proportions visuelles quelle que soit la mise à l'échelle Windows. Si l'utilisateur a déjà personnalisé la taille ou le zoom, ses réglages sont toujours respectés.
