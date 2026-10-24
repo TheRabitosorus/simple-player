@@ -2,6 +2,24 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.27 — 23 octobre 2026
+
+- **Idle — tick = bouton d'ajout à une playlist.** Le bouton + disparaît en mode idle. À la place, la tique verte (ou grise) est maintenant cliquable/tactile et ouvre directement le menu « ajouter à une playlist » au centre de l'écran.
+- Le bouton + reste présent et fonctionnel en mode normal.
+
+## v1.20.26 — 23 octobre 2026
+
+- **Tick « liké » décalée de +10px vers le bas** dans les deux modes (normal et idle).
+- **Mode normal — plus d'espace au-dessus de la pochette.** Le padding-top de la zone de lecture passe de 20px à 36px : la pochette, le titre et la barre de temps descendent légèrement, laissant plus de place à la tick qui ne chevauche plus la couverture.
+
+## v1.20.25 — 23 octobre 2026
+
+- **Ajout à une playlist — permission manquante.** Si Spotify renvoie une 403 (token sans le scope `playlist-modify`), un dialog s'affiche avec un bouton « Reconnecter Spotify ». La reconnexion ouvre le navigateur pour ré-autoriser les bons scopes, puis relance automatiquement l'ajout.
+
+## v1.20.24 — 23 octobre 2026
+
+- **Zone de volume agrandie (mode normal).** Toute la largeur du rail de volume est maintenant interactive — plus besoin de viser précisément la fine barre. Le curseur change en flèche haut/bas pour indiquer la zone.
+
 ## v1.20.23 — 23 octobre 2026
 
 - **Tique « liké » recentrée (mode normal).** Elle est désormais alignée sur le même axe vertical que le bouton play/pause et le bouton +, et non plus sur le centre géométrique de la swipeZone (qui est décalée par le rail de volume à droite).

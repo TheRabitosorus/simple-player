@@ -63,7 +63,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:clamp(14px,3vh,28px);
-  padding:20px calc(var(--rail-w) + 62px) 16px 20px;
+  padding:36px calc(var(--rail-w) + 62px) 16px 20px;
   transition:padding .25s ease;
   /* We handle both the horizontal (track swipe) and vertical (volume)
      drag entirely in JS — touch-action:pan-y was telling the browser to
@@ -113,7 +113,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    rail; in idle mode the rail is invisible, so without this the whole
    centered column (art included) stays shifted left by that reserved
    space. Equalize the padding so it's actually centered. */
-#app.idle #swipeZone{padding-right:20px;}
+#app.idle #swipeZone{padding-right:20px;padding-top:20px;}
 /* The idle-mode volume bar lives INSIDE #idleVolumeZone, centred in the strip. */
 #idleVolIcon{position:absolute;top:-38px;left:50%;transform:translateX(-50%);width:28px;height:28px;color:var(--fg-dim);}
 #idleVolIcon svg{width:100%;height:100%;}
@@ -137,9 +137,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #likedBadge{position:absolute;left:calc(50% - (var(--rail-w) + 42px) / 2);transform:translateX(-50%);z-index:2;pointer-events:none;}
 /* In idle mode the padding is symmetric (20px each side), so 50% is correct */
 #app.idle #likedBadge{left:50%;}
-/* In idle mode the badge is positioned absolutely in the top space and shown 2× bigger */
-#app.idle #likedBadge{pointer-events:none;}
+/* In idle mode the tick IS the add-to-playlist button — make it interactive */
+#app.idle #likedBadge{pointer-events:auto;cursor:pointer;}
+#app.idle #likedBadge:hover{opacity:.75;}
+#app.idle #likedBadge:active{transform:translateX(-50%) scale(.88);}
 #app.idle .liked-badge svg{width:44px;height:44px;}
+/* Hide the + button in idle — the tick takes over */
+#app.idle #addToLibraryWrap{display:none !important;}
 
 /* artWrap takes exactly whatever vertical space is left over after its
    siblings (liked badge, track info, progress, transport, add-to-library)
@@ -379,15 +383,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   display:flex;flex-direction:column;align-items:center;gap:14px;
   touch-action:none;
   transition:width .25s ease;
+  cursor:ns-resize;
 }
 #volumeRail .vr-icon{width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:var(--fg-dim);flex:0 0 auto;border-radius:10px;}
 #volumeRail .vr-icon:hover{background:var(--bg-elev);color:var(--fg);}
 #volumeRail .vr-icon svg{width:22px;height:22px;}
-#volTrack{flex:1 1 auto;width:var(--vol-track-w);border-radius:5px;background:var(--bg-elev-2);position:relative;cursor:pointer;transition:width .25s ease;}
-/* Doubles the touch/click hit area on either side without changing the
-   visible track width — a transparent, wider box layered over the same
-   area, so the finger has roughly twice the margin for error. */
-#volTrack::before{content:'';position:absolute;top:0;bottom:0;left:calc(var(--vol-track-w) * -1);right:calc(var(--vol-track-w) * -1);}
+#volTrack{flex:1 1 auto;width:var(--vol-track-w);border-radius:5px;background:var(--bg-elev-2);position:relative;transition:width .25s ease;pointer-events:none;}
+/* The whole #volumeRail is now the drag target (see JS), so the track
+   itself doesn't need pointer events or a fake hit-area ::before. */
 #volFill{position:absolute;bottom:0;left:0;right:0;border-radius:5px;background:var(--accent);height:70%;}
 #volThumb{position:absolute;left:50%;width:20px;height:20px;border-radius:50%;background:var(--fg);bottom:70%;transform:translate(-50%,50%);box-shadow:0 1px 4px rgba(0,0,0,.5);}
 #volLabel{font-family:var(--mono-font);font-size:13px;color:var(--fg-dim);flex:0 0 auto;font-variant-numeric:tabular-nums;}
@@ -1043,11 +1046,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Art top relative to swipeZone:
       var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
       var artBotInSw = artTopInSw + size;
-      // Liked badge: centred in the space above the cover
+      // Liked badge: centred in the space above the cover, +10px down
       if ($lb) {
         var zoneCenter = artTopInSw / 2;
         var badgeH = 44;
-        $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2)) + 'px';
+        $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2 + 10)) + 'px';
       }
       // + button position is handled by CSS (bottom-right corner); clear any
       // leftover inline top that a previous JS pass may have set.
@@ -1059,7 +1062,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         var artTopInSwNormal = awRect.top - swRect.top + (awRect.height - size) / 2;
         var badgeHNormal = 22;
         var spaceAboveNormal = artTopInSwNormal;
-        var badgeTopNormal = Math.round(Math.max(4, spaceAboveNormal / 2 - badgeHNormal / 2));
+        var badgeTopNormal = Math.round(Math.max(4, spaceAboveNormal / 2 - badgeHNormal / 2 + 10));
         $lb.style.top = badgeTopNormal + 'px';
       }
       if ($addWrap) $addWrap.style.top = '';
@@ -1306,7 +1309,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
 
     function onDown(e){
-      if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap')) return;
+      if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap') || e.target.closest('#likedBadge')) return;
       genId++;
       downOnArt = !!e.target.closest('#art');
       dragging = true; locked = null; pid = e.pointerId;
@@ -1480,25 +1483,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var level = state.volume === 0 ? 'mute' : (state.volume <= 33 ? 1 : (state.volume <= 66 ? 2 : 3));
       volIcon.innerHTML = VOL_ICONS_MAP[level];
     }
-    // Same behaviour as the idle-mode volume zone: touching does NOT jump
-    // the volume; dragging up/down moves it relative to where it was when
-    // the touch started, at VOLUME_DRAG_PX of finger travel for the full range.
+    // The whole #volumeRail is the drag target — much easier to hit than the
+    // narrow track alone. Dragging up/down moves the volume relative to where
+    // it was when the touch started (no jump-to-position behaviour).
+    var rail = document.getElementById('volumeRail');
     var dragging = false, dragStartY = 0, dragStartVol = 0, dragPid = null;
     function notifyVolumeChange(){ if (onVolumeChange) onVolumeChange(state.volume); }
-    track.addEventListener('pointerdown', function(e){
+    rail.addEventListener('pointerdown', function(e){
+      if (e.target === muteBtn || muteBtn.contains(e.target)) return; // let mute button work normally
       dragging = true; dragPid = e.pointerId;
       dragStartY = e.clientY; dragStartVol = state.volume;
-      try { track.setPointerCapture(dragPid); } catch (err) {}
+      try { rail.setPointerCapture(dragPid); } catch (err) {}
       e.preventDefault();
     });
-    track.addEventListener('pointermove', function(e){
+    rail.addEventListener('pointermove', function(e){
       if (!dragging) return;
       var v = dragStartVol - ((e.clientY - dragStartY) / VOLUME_DRAG_PX) * 100;
       state.volume = Math.max(0, Math.min(100, v));
       render(); notifyVolumeChange();
     });
-    track.addEventListener('pointercancel', function(){ dragging = false; });
-    track.addEventListener('pointerup', function(){ dragging = false; });
+    rail.addEventListener('pointercancel', function(){ dragging = false; });
+    rail.addEventListener('pointerup', function(){ dragging = false; });
     muteBtn.addEventListener('click', function(){
       if (state.volume > 0){ lastVolume = state.volume; state.volume = 0; }
       else { state.volume = lastVolume || 70; }
@@ -1558,10 +1563,42 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         updateLikedBadge();
         showToast('Added to "' + pl.name + '"');
       }).catch(function(err){
-        var msg = /\b403\b/.test(err.message)
-          ? 'Reconnect Spotify in Settings (new permission needed)'
-          : 'Could not reach Spotify';
-        showToast(msg);
+        if (err && err.status === 403 && window.simplePlayer && window.simplePlayer.spotifyConnect) {
+          // Token is missing the playlist-modify scope — show a dialog that
+          // triggers reconnect (which re-requests all scopes) then retries.
+          var back = document.createElement('div');
+          back.id = 'dialogBackdrop';
+          var box = document.createElement('div');
+          box.id = 'dialogBox';
+          box.setAttribute('role', 'dialog');
+          box.innerHTML = '<h4>Permission manquante</h4>' +
+            '<p>Simple Player doit se reconnecter à Spotify pour pouvoir ajouter des morceaux à tes playlists. ' +
+            'Ton navigateur va s\'ouvrir — connecte-toi, puis reviens ici.</p>' +
+            '<div class="dlg-actions"><button class="later">Plus tard</button>' +
+            '<button class="primary reconnect">Reconnecter Spotify</button></div>';
+          document.body.appendChild(back);
+          document.body.appendChild(box);
+          function closeDialog(){ back.remove(); box.remove(); }
+          back.addEventListener('click', closeDialog);
+          box.querySelector('.later').addEventListener('click', closeDialog);
+          box.querySelector('.reconnect').addEventListener('click', function(){
+            closeDialog();
+            window.simplePlayer.spotifyConnect().then(function(res){
+              if (!res.connected){ showToast('Reconnexion échouée — réessaie depuis Settings'); return; }
+              // Retry the add now that we have the right scopes
+              spotifyApi('/playlists/' + pl.id + '/tracks', {
+                method: 'POST',
+                body: JSON.stringify({ uris: [trackUri] })
+              }).then(function(){
+                addedPlaylistSet.add(trackId);
+                updateLikedBadge();
+                showToast('Ajouté à "' + pl.name + '"');
+              }).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
+            });
+          });
+        } else {
+          showToast('Could not reach Spotify');
+        }
       });
     }
 
@@ -1650,6 +1687,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     });
     backdrop.addEventListener('click', closeMenu);
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
+
+    // In idle mode the liked badge acts as the add-to-playlist trigger
+    var $lbBtn = document.getElementById('likedBadge');
+    if ($lbBtn) {
+      $lbBtn.addEventListener('click', function(){
+        var isIdleNow = document.getElementById('app').classList.contains('idle');
+        if (!isIdleNow) return; // normal mode: + button handles it
+        if (!menu.hidden){ closeMenu(); return; }
+        buildMenu();
+        if (menu.parentElement !== document.body) document.body.appendChild(menu);
+        menu.classList.add('idle-menu');
+        menu.hidden = false;
+        backdrop.hidden = false;
+      });
+    }
   })();
 
   // The tab bar is always visible now (see #tabbar's CSS) — no reveal
