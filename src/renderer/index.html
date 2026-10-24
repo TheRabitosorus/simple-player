@@ -77,6 +77,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Mode immersif (3s sans interaction) ---------- */
 /* Reste visible : tique "liké", pastille playlist, titre + artiste. Le reste s'efface. */
+/* Smooth idle ↔ normal transition: the whole swipeZone scales slightly so
+   the cover zoom feels organic rather than a jump. The art itself already
+   animates its width/height; the scale here bridges the gap between those
+   two states while the layout reflows. */
+#swipeZone{transform-origin:center center;transition:padding .35s ease, transform .35s cubic-bezier(.22,.61,.36,1);}
+#app.idle #swipeZone{transform:scale(1);}   /* idle: full size */
+/* When transitioning INTO idle we briefly boost scale then settle.
+   Done with a tiny CSS animation so we don't need JS to toggle a class. */
+@keyframes idleEnter{0%{transform:scale(.96);}100%{transform:scale(1);}}
+@keyframes idleLeave{0%{transform:scale(1.04);}100%{transform:scale(1);}}
+#app.idle-enter #swipeZone{animation:idleEnter .35s cubic-bezier(.22,.61,.36,1) forwards;}
+#app.idle-leave #swipeZone{animation:idleLeave .35s cubic-bezier(.22,.61,.36,1) forwards;}
 #tabbar{transition:opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;max-height:160px;overflow:hidden;}
 #progressWrap,#transport{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;overflow:hidden;}
 #addToLibraryWrap{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;}
@@ -86,6 +98,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    idle mode so it never competes with the always-visible rail's own
    controls or anything else. */
 #idleVolumeZone{position:absolute;top:0;bottom:0;right:0;left:100%;pointer-events:none;touch-action:none;}
+#app.idle #idleVolumeZone{top:auto;bottom:auto;} /* bounds set by fitArtSquare() */
 #app.idle #idleVolumeZone{left:auto;pointer-events:auto;}
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;padding:0;pointer-events:none;}
@@ -177,6 +190,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #transport{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3vw,26px);flex:0 0 auto;}
 .ctrl{display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--fg);flex:0 0 auto;transition:background .12s,color .12s,transform .08s;}
 .ctrl:active{transform:scale(.92);}
+/* Remove the browser focus ring after a touch/click — keep it for keyboard nav */
+.ctrl:focus:not(:focus-visible){outline:none;background:transparent;}
 .ctrl-prev,.ctrl-next{width:74px;height:74px;}
 .ctrl-prev svg,.ctrl-next svg{width:31px;height:31px;}
 .ctrl-play{width:96px;height:96px;background:var(--accent);color:#06130c;}
@@ -285,9 +300,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
-#app.idle #addToLibraryWrap{position:absolute;left:0;right:0;display:flex;justify-content:center;}
-#app.idle .add-btn{width:75px;height:75px;border-radius:50%;}
-#app.idle .add-btn svg{width:32px;height:32px;}
+/* Idle: + button pinned to the bottom-right corner of swipeZone */
+#app.idle #addToLibraryWrap{
+  position:absolute;
+  bottom:18px;
+  right:18px;
+  left:auto;
+  display:flex;
+  justify-content:flex-end;
+}
+#app.idle .add-btn{width:62px;height:62px;border-radius:50%;}
+#app.idle .add-btn svg{width:26px;height:26px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -970,17 +993,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // entry/exit, resize, zoom, tab switches all already call this).
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
-      // The activation zone covers the full gap between the right edge of the
-      // cover art and the right edge of the swipeZone. Use the art's position
-      // relative to the swipeZone (their common positioned ancestor) so that
-      // left + right are measured in the same coordinate space.
+      // The activation zone covers the gap between the right edge of the
+      // cover art and the right edge of the swipeZone, but only vertically
+      // from the top of the art to the BOTTOM of the art — not lower, so the
+      // + button corner stays clear of the volume zone.
       var artRect = $art.getBoundingClientRect();
       var swRect2 = ($artWrap.closest('#swipeZone') || document.body).getBoundingClientRect();
-      // Art right edge in swipeZone coordinates + a small gap
       var gapLeft = Math.round(artRect.right - swRect2.left) + 8;
+      var artTopInSw2 = Math.round(artRect.top - swRect2.top);
+      var artBotInSw2 = Math.round(artRect.bottom - swRect2.top);
       idleZone.style.left = gapLeft + 'px';
       idleZone.style.right = '0';
-      idleZone.style.width = '';  // let left+right define the width
+      idleZone.style.width = '';
+      idleZone.style.top = artTopInSw2 + 'px';
+      idleZone.style.bottom = (swRect2.height - artBotInSw2) + 'px';
     }
     // Position the liked badge and + button in idle mode.
     var $lb = document.getElementById('likedBadge');
@@ -998,26 +1024,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         var badgeH = 44;
         $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2)) + 'px';
       }
-      // + button: centred between the bottom of #trackArtist and the bottom of the swipeZone
-      if ($addWrap) {
-        var $artist = document.getElementById('trackArtist');
-        var artistBotInSw = $artist
-          ? $artist.getBoundingClientRect().bottom - swRect.top
-          : artBotInSw;
-        var spaceBelow = swRect.height - artistBotInSw;
-        var btnH = 75; // idle button (75px)
-        var btnTop = artistBotInSw + Math.round((spaceBelow - btnH) / 2);
-        var btnTopMax = swRect.height - btnH - 8;
-        $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, Math.min(btnTop, btnTopMax))) + 'px';
-      }
+      // + button position is handled by CSS (bottom-right corner); clear any
+      // leftover inline top that a previous JS pass may have set.
+      if ($addWrap) $addWrap.style.top = '';
     } else {
-      // Normal player: liked badge centred between bottom of cover and bottom of swipeZone
+      // Normal player: liked badge above the cover art, vertically centred
+      // in the space between the top of swipeZone and the top of the art.
       if ($lb) {
-        var artBotInSwNormal = awRect.bottom - swRect.top;
-        var spaceNormal = swRect.height - artBotInSwNormal;
+        var artTopInSwNormal = awRect.top - swRect.top + (awRect.height - size) / 2;
         var badgeHNormal = 22;
-        var badgeTopNormal = artBotInSwNormal + Math.round((spaceNormal - badgeHNormal) / 2);
-        $lb.style.top = Math.round(Math.max(artBotInSwNormal + 4, badgeTopNormal)) + 'px';
+        var spaceAboveNormal = artTopInSwNormal;
+        var badgeTopNormal = Math.round(Math.max(4, spaceAboveNormal / 2 - badgeHNormal / 2));
+        $lb.style.top = badgeTopNormal + 'px';
       }
       if ($addWrap) $addWrap.style.top = '';
     }
@@ -1602,10 +1620,28 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var app = document.getElementById('app');
     var timer = null;
     function isPlayerActive(){ return document.getElementById('view-player').classList.contains('active'); }
-    function clear(){ app.classList.remove('idle'); if (timer){ clearTimeout(timer); timer = null; } fitArtSquare(); }
+    function triggerIdleAnim(cls){
+      app.classList.remove('idle-enter','idle-leave');
+      // Force reflow so removing+adding the class triggers the animation fresh
+      void app.offsetWidth; // eslint-disable-line no-void
+      app.classList.add(cls);
+      setTimeout(function(){ app.classList.remove(cls); }, 380);
+    }
+    function clear(){
+      triggerIdleAnim('idle-leave');
+      app.classList.remove('idle');
+      if (timer){ clearTimeout(timer); timer = null; }
+      fitArtSquare();
+    }
     function schedule(){
       if (timer) clearTimeout(timer);
-      timer = setTimeout(function(){ if (isPlayerActive()){ app.classList.add('idle'); fitArtSquare(); } }, settings.idleDelay);
+      timer = setTimeout(function(){
+        if (isPlayerActive()){
+          triggerIdleAnim('idle-enter');
+          app.classList.add('idle');
+          fitArtSquare();
+        }
+      }, settings.idleDelay);
     }
     function activity(){
       // Keeps the idle timer from firing while the user is actively using
@@ -1620,6 +1656,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function exitIdle(){
       // Explicit dismissal (double-tap). Unlike clear(), this re-arms the
       // timer so immersive mode can re-engage after another idle period.
+      triggerIdleAnim('idle-leave');
       app.classList.remove('idle');
       fitArtSquare();
       schedule();

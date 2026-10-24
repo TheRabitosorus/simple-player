@@ -2,6 +2,18 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.20 — 23 octobre 2026
+
+- **Croix X quitte vraiment l'app.** Avant, la croix cachait Simple Player dans le tray sans quitter — Spotify continuait donc à jouer indéfiniment. Désormais la croix déclenche un vrai quit (pause Spotify + kill Ghost Spotify + fermeture). Le tray reste disponible pour afficher/masquer la fenêtre.
+
+## v1.20.19 — 23 octobre 2026
+
+- **Transition idle ↔ normal plus fluide.** Légère animation de zoom (scale) au passage entre les deux modes — plus de saut visuel.
+- **Tick (likedBadge) en player normal.** Repositionnée au-dessus de la pochette (centrée dans l'espace au-dessus de la cover), comme avant.
+- **Bouton + en idle.** Fixé dans le coin inférieur droit de la zone, toujours visible — plus de positionnement JS approximatif.
+- **Zone volume idle.** Limitée verticalement à la hauteur de la pochette (haut → bas de la cover) ; n'empiète plus sur la zone du bouton +.
+- **Rond noir qui reste sur Prev/Next.** Suppression du focus ring navigateur après un tap tactile (conservé pour la navigation clavier).
+
 ## v1.20.18 — 23 octobre 2026
 
 - **Musique qui continue après quit — corrigé.** La séquence de fermeture est désormais : pause API → 800ms → kill Ghost Spotify → quit. Avant, le kill et le quit arrivaient simultanément au pause, ce qui ne laissait pas le temps à Spotify de traiter l'arrêt. De plus, le pause est forcé même si un backoff 429 est en cours.

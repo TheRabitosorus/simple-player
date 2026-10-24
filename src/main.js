@@ -196,8 +196,10 @@ function createWindow() {
   });
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
+      // X button = real quit (pause Spotify + kill Ghost), not hide-to-tray.
       event.preventDefault();
-      mainWindow.hide();
+      isQuitting = true;
+      app.quit();
     } else {
       saveBounds();
     }
