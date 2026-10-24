@@ -154,7 +154,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{text-align:center;max-width:min(80vw,420px);flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;}
-#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-28px;padding-bottom:0;}
+#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-29px;padding-bottom:0;}
 #trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -286,8 +286,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
 #app.idle #addToLibraryWrap{position:absolute;left:0;right:0;display:flex;justify-content:center;}
-#app.idle .add-btn{width:94px;height:94px;border-radius:50%;}
-#app.idle .add-btn svg{width:40px;height:40px;}
+#app.idle .add-btn{width:75px;height:75px;border-radius:50%;}
+#app.idle .add-btn svg{width:32px;height:32px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -1005,9 +1005,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           ? $artist.getBoundingClientRect().bottom - swRect.top
           : artBotInSw;
         var spaceBelow = swRect.height - artistBotInSw;
-        var btnH = 94; // idle button (94px)
+        var btnH = 75; // idle button (75px)
         var btnTop = artistBotInSw + Math.round((spaceBelow - btnH) / 2);
-        $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, btnTop)) + 'px';
+        var btnTopMax = swRect.height - btnH - 8;
+        $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, Math.min(btnTop, btnTopMax))) + 'px';
       }
     } else {
       // Normal player: liked badge centred between bottom of cover and bottom of swipeZone
@@ -2122,6 +2123,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   async function spotifyApi(path, options){
     options = options || {};
+    // Honour rate-limit backoff for all requests (not just polls).
+    if (Date.now() < rateLimitedUntil) {
+      var waitErr = new Error('Spotify rate-limited, backing off');
+      waitErr.status = 429;
+      waitErr.retryAfter = Math.ceil((rateLimitedUntil - Date.now()) / 1000);
+      throw waitErr;
+    }
     var token;
     try {
       token = await window.simplePlayer.spotifyGetAccessToken();
@@ -2145,6 +2153,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var err = new Error('Spotify API error ' + res.status + ' on ' + path + (reason ? ' (' + reason + ')' : ''));
       err.status = res.status;
       err.reason = reason;
+      // Parse Retry-After so callers can back off for the right duration.
+      if (res.status === 429) {
+        var ra = parseInt(res.headers.get('Retry-After') || '5', 10);
+        err.retryAfter = isNaN(ra) ? 5 : ra;
+        rateLimitedUntil = Date.now() + err.retryAfter * 1000;
+      }
       throw err;
     }
     // Spotify answers some commands (next, previous, shuffle, repeat...) with
@@ -2516,7 +2530,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
   // Show the expected track right now (before Spotify confirms).
   var lastOptimisticAt = 0;
-  function pollSoon(){ pollPlaybackState(); setTimeout(pollPlaybackState, 800); setTimeout(pollPlaybackState, 1800); }
+  var pollSoonTimers = [];
+  function pollSoon(){
+    // Cancel any pending pollSoon timers before scheduling new ones, so
+    // rapid user actions (skip, skip, skip) don't stack up bursts of polls.
+    pollSoonTimers.forEach(function(t){ clearTimeout(t); });
+    pollSoonTimers = [];
+    pollPlaybackState();
+    pollSoonTimers.push(setTimeout(pollPlaybackState, 800));
+    pollSoonTimers.push(setTimeout(pollPlaybackState, 1800));
+  }
   function optimisticSwitch(t){
     if (!t) return false;
     lastOptimisticAt = Date.now();
@@ -2650,8 +2673,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // ones), and nothing while the window is hidden in the tray — saves
   // Spotify API calls and battery. Polling resumes the moment it's shown.
   var pollInFlight = false;
+  // When Spotify returns 429, we store the earliest time we may query again.
+  var rateLimitedUntil = 0;
+
   function pollPlaybackState(){
     if (pollInFlight || document.hidden) return Promise.resolve();
+    if (Date.now() < rateLimitedUntil) return Promise.resolve(); // respect rate-limit backoff
     pollInFlight = true;
     var startedAt = Date.now();
     return spotifyApi('/me/player').then(function(s){
@@ -2664,7 +2691,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       rememberLastPlayed(s);
       showSavedTrackIfIdle(s);
     })
-      .catch(function(){ /* transient network hiccup: next poll retries */ })
+      .catch(function(err){
+        // If Spotify says we're rate-limited, pause polling for the requested
+        // duration (default 5 s if the header is absent).
+        if (err && err.status === 429) {
+          var retryAfter = (err.retryAfter || 5);
+          rateLimitedUntil = Date.now() + retryAfter * 1000;
+        }
+        // other transient errors: next regular poll retries
+      })
       .then(function(){ pollInFlight = false; });
   }
   document.addEventListener('visibilitychange', function(){
@@ -2751,19 +2786,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // they fall back to Spotify's volume for the active device. Requests are
   // throttled so dragging doesn't flood the helper / Spotify's API.
   var windowsVolume = false;
-  var lastVolumeSentAt = 0, volumeTimer = null, volumeTouchedAt = 0;
+  var volumeTimer = null, volumeTouchedAt = 0;
 
   function sendVolume(vol){
-    lastVolumeSentAt = Date.now();
     if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
     else if (windowsVolume) window.simplePlayer.volumeSet(Math.round(vol));
   }
   onVolumeChange = function(vol){
     volumeTouchedAt = Date.now();
-    var wait = (windowsVolume ? 40 : 300) - (Date.now() - lastVolumeSentAt);
-    if (wait <= 0) { sendVolume(vol); return; }
+    // Debounce: for Spotify (remote), wait 200 ms of silence before sending
+    // so dragging the rail doesn't flood the API with PUT requests.
+    // For Windows master volume the latency budget is tighter (40 ms).
+    var debounce = windowsVolume ? 40 : 200;
     clearTimeout(volumeTimer);
-    volumeTimer = setTimeout(function(){ sendVolume(state.volume); }, wait); // always ends on the final value
+    volumeTimer = setTimeout(function(){ sendVolume(state.volume); }, debounce);
   };
 
   // Keep the bar in sync with the real Windows volume (changed by keyboard,
@@ -2800,6 +2836,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // Pause Spotify just before the app exits so the music stops.
     window.simplePlayer.onAppWillQuit(function(){
       if (useRealPlayback && state.playing){
+        // Force the pause even if we're in a rate-limit backoff window —
+        // stopping music on quit is more important than the backoff.
+        rateLimitedUntil = 0;
         spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){});
       }
     });

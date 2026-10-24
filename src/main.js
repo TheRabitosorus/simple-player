@@ -647,14 +647,19 @@ app.on('before-quit', (event) => {
   if (!quitSignalSent && mainWindow && !mainWindow.isDestroyed()) {
     // First pass: tell the renderer to pause Spotify, then re-emit quit
     // after a short delay so the pause request has time to reach the server.
+    // We wait 1200 ms before killing Ghost Spotify so the API pause call
+    // can complete before the local Spotify process is torn down.
     event.preventDefault();
     quitSignalSent = true;
     isQuitting = true;
     mainWindow.webContents.send('app:will-quit');
     setTimeout(() => {
-      killGhostSpotifyIfAny();
       stopVolumeHelper();
-      app.quit();
+      // Kill Ghost Spotify last, after the pause has had time to land.
+      setTimeout(() => {
+        killGhostSpotifyIfAny();
+        app.quit();
+      }, 400);
     }, 800);
     return;
   }

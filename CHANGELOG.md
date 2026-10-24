@@ -2,6 +2,21 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.18 — 23 octobre 2026
+
+- **Musique qui continue après quit — corrigé.** La séquence de fermeture est désormais : pause API → 800ms → kill Ghost Spotify → quit. Avant, le kill et le quit arrivaient simultanément au pause, ce qui ne laissait pas le temps à Spotify de traiter l'arrêt. De plus, le pause est forcé même si un backoff 429 est en cours.
+
+## v1.20.17 — 23 octobre 2026
+
+- **Gestion du rate-limiting Spotify (erreur 429 "too busy").** Trois corrections :
+  1. `spotifyApi()` lit le header `Retry-After` sur les réponses 429 et bloque *toutes* les requêtes (polls et commandes) pendant la durée indiquée par Spotify.
+  2. `pollSoon()` annule les timers précédents avant d'en créer de nouveaux — plusieurs actions rapides n'empilent plus des rafales de polls.
+  3. Volume : debounce propre à 200 ms pour Spotify (était un throttle mal calibré) — glisser le rail n'envoie plus qu'une seule requête après 200 ms de silence.
+
+## v1.20.16 — 23 octobre 2026
+
+- **Player idle — ajustements bouton +.** Titre/artiste décalé 1px vers le haut (`margin-top:-29px`). Bouton + réduit de 20% (94px → 75px, svg 40px → 32px). Position JS recalculée avec cap bas pour que le bouton reste entièrement visible dans la zone.
+
 ## v1.20.15 — 23 octobre 2026
 
 - **Auto-updater complet.** Au lancement, Simple Player vérifie silencieusement si une nouvelle version existe sur GitHub. Quand elle est téléchargée, un pop-up s'affiche avec « Installer maintenant » (redémarre et installe) ou « Plus tard ». L'installeur NSIS et le désinstalleur Windows (Ajout/Suppression de programmes) sont déjà configurés via electron-builder.
