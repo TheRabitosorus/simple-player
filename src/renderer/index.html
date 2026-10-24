@@ -1159,20 +1159,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
       // idleVolumeZone is position:absolute inside #swipeZone.
-      // Use offsetLeft/offsetWidth — these are already in swipeZone's local
-      // coordinate space and are not affected by CSS transforms on swipeZone.
-      // #artWrap is centred inside swipeZone; #art is centred inside #artWrap.
+      // Use offset* properties — already in swipeZone's local coordinate space,
+      // unaffected by CSS transforms on swipeZone.
+      var swEl2       = $artWrap.parentElement; // #swipeZone
       var artWrapLeft = $artWrap.offsetLeft;
+      var artWrapTop  = $artWrap.offsetTop;
       var artWrapW    = $artWrap.offsetWidth;
+      var artWrapH    = $artWrap.offsetHeight;
+      // Art is centred inside artWrap.
       var artLeft     = Math.round(artWrapLeft + (artWrapW - size) / 2);
       var artRight    = artLeft + size;
+      var artTop      = Math.round(artWrapTop  + (artWrapH - size) / 2);
+      var artBottom   = artTop + size;
 
-      // Orange zone: full height, starts flush at the right edge of the cover.
+      // Zone layout (matches reference image):
+      // Orange = right of cover, top of window → bottom of cover (no overlap with yellow).
+      // Yellow = full width, below the cover → bottom of window (handled by swipe handler).
       idleZone.style.left   = artRight + 'px';
       idleZone.style.right  = '0';
       idleZone.style.width  = '';
       idleZone.style.top    = '0';
-      idleZone.style.bottom = '0';
+      idleZone.style.bottom = (swEl2.offsetHeight - artBottom) + 'px';
     }
     // Position the liked badge and + button in idle mode.
     var $lb = document.getElementById('likedBadge');

@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.57 — 24 octobre 2026
+
+- **Idle : zone volume corrigée en hauteur.** La zone orange s'arrête maintenant au bas de la pochette (plus de chevauchement avec la zone jaune). Calcul via `offsetTop`/`offsetHeight` — cohérent avec la correction horizontale de la v1.20.56. La zone jaune (swipe) couvre bien toute la largeur sous la pochette.
+
 ## v1.20.56 — 24 octobre 2026
 
 - **Idle : zone volume repositionnée correctement.** L'ancienne méthode (`getBoundingClientRect` avec transform temporairement effacé) donnait des coordonnées erronées à cause du padding de `#swipeZone`. Remplacé par `offsetLeft`/`offsetWidth` qui opèrent directement dans le système de coordonnées local de swipeZone, sans être affectés par les transforms CSS. La zone orange démarre maintenant exactement au bord droit de la pochette.
