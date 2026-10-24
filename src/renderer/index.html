@@ -63,7 +63,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:clamp(14px,3vh,28px);
-  padding:20px calc(var(--rail-w) + 12px) 16px 20px;
+  padding:20px calc(var(--rail-w) + 62px) 16px 20px;
   transition:padding .25s ease;
   /* We handle both the horizontal (track swipe) and vertical (volume)
      drag entirely in JS — touch-action:pan-y was telling the browser to
@@ -118,8 +118,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .liked-badge{display:flex;align-items:center;justify-content:center;color:var(--fg-faint);flex:0 0 auto;transition:color .15s;}
 .liked-badge svg{width:22px;height:22px;flex:0 0 auto;}
 .liked-badge.on{color:var(--accent);}
+/* In normal mode: removed from flow, positioned by fitArtSquare() */
+#likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;}
 /* In idle mode the badge is positioned absolutely in the top space and shown 2× bigger */
-#app.idle #likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;}
+#app.idle #likedBadge{pointer-events:none;}
 #app.idle .liked-badge svg{width:44px;height:44px;}
 
 /* artWrap takes exactly whatever vertical space is left over after its
@@ -152,7 +154,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{text-align:center;max-width:min(80vw,420px);flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;}
-#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);}
+#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-8px;padding-bottom:0;}
 #trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -284,6 +286,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
 #app.idle #addToLibraryWrap{position:absolute;left:0;right:0;display:flex;justify-content:center;}
+#app.idle .add-btn{width:156px;height:156px;border-radius:50%;}
+#app.idle .add-btn svg{width:66px;height:66px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -303,6 +307,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   min-width:360px;max-width:480px;max-height:60vh;overflow-y:auto;
   background:var(--bg-elev-2);border:1px solid var(--border);border-radius:18px;
   padding:10px;box-shadow:0 16px 40px -12px rgba(0,0,0,.6);z-index:40;
+}
+#app.idle #addMenu{
+  position:fixed;top:50%;left:50%;bottom:auto;
+  transform:translate(-50%,-50%);
 }
 .add-menu-item{
   display:flex;align-items:center;gap:16px;width:100%;text-align:left;
@@ -331,7 +339,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Volume rail ---------- */
 #volumeRail{
-  position:absolute;top:0;bottom:0;right:0;width:var(--rail-w);
+  position:absolute;top:0;bottom:0;right:50px;width:var(--rail-w);
   padding-top:14px;padding-bottom:14px;
   padding-right:max(10px, env(safe-area-inset-right,0px));
   display:flex;flex-direction:column;align-items:center;gap:14px;
@@ -367,11 +375,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
      centered middle item (Library) lines up under the "+" button above,
      which is centered within that same reserved-for-the-volume-rail
      content width, not the window's true center. */
-  padding-left:20px;padding-right:calc(var(--rail-w) + 12px);
+  padding-left:20px;padding-right:calc(var(--rail-w) + 62px);
 }
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
-  right:calc(var(--rail-w)/2 - 22px + max(10px, env(safe-area-inset-right,0px)));
+  right:calc(var(--rail-w)/2 + 28px + max(10px, env(safe-area-inset-right,0px)));
   width:64px;height:64px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   color:var(--fg-faint);transition:background .12s,color .12s,right .25s ease;
@@ -997,12 +1005,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           ? $artist.getBoundingClientRect().bottom - swRect.top
           : artBotInSw;
         var spaceBelow = swRect.height - artistBotInSw;
-        var btnH = 52;
+        var btnH = 156; // idle button is 3× (156px)
         var btnTop = artistBotInSw + Math.round((spaceBelow - btnH) / 2);
         $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, btnTop)) + 'px';
       }
     } else {
-      if ($lb) $lb.style.top = '';
+      // Normal player: liked badge centred between bottom of cover and bottom of swipeZone
+      if ($lb) {
+        var artBotInSwNormal = awRect.bottom - swRect.top;
+        var spaceNormal = swRect.height - artBotInSwNormal;
+        var badgeHNormal = 22;
+        var badgeTopNormal = artBotInSwNormal + Math.round((spaceNormal - badgeHNormal) / 2);
+        $lb.style.top = Math.round(Math.max(artBotInSwNormal + 4, badgeTopNormal)) + 'px';
+      }
       if ($addWrap) $addWrap.style.top = '';
     }
   }

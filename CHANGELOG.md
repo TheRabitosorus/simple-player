@@ -2,6 +2,17 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.9 — 23 octobre 2026
+
+- **Mode normal — barre de volume décalée 50px vers la gauche.** Le rail de volume (`#volumeRail`) est maintenant à `right:50px` au lieu de `right:0`, et le padding du contenu a été ajusté en conséquence.
+- **Mode normal — tick de playlist centrée.** La coche est maintenant positionnée par JS exactement au milieu vertical de l'espace entre le bas de la pochette et le bas de l'app.
+- **Mode idle — menu « Ajouter à une playlist » centré à l'écran.** La fenêtre de sélection s'affiche maintenant en plein milieu de l'écran (position fixe, centré H+V) au lieu d'apparaître au-dessus du bouton.
+
+## v1.20.8 — 23 octobre 2026
+
+- **Mode idle — bouton + trois fois plus grand.** 156px (était 52px), icône 66px, uniquement en idle.
+- **Mode idle — titre/artiste remonté.** Moins d'espace entre la pochette et le texte, ce qui laisse plus de place au bouton + en bas.
+
 ## v1.20.7 — 23 octobre 2026
 
 - **Mode idle — titre et artiste deux fois plus grands.** Titre jusqu'à 56px (était 28px), artiste jusqu'à 32px (était 14px).
