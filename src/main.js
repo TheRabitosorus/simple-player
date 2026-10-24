@@ -120,7 +120,33 @@ function isPositionVisible(b) {
 }
 
 function createWindow() {
-  const bounds = store.get('windowBounds');
+  let bounds = store.get('windowBounds');
+
+  // At high Windows DPI scaling (e.g. 175%), the logical window size must be
+  // reduced so the physical window doesn't exceed the available screen area.
+  // We only auto-adjust the DEFAULT size (when the user hasn't explicitly
+  // resized the window yet); once they've saved custom bounds we leave them
+  // alone — they know best how big they want it.
+  const defaults = { width: 480, height: 760 };
+  const isDefaultSize = (bounds.width === defaults.width && bounds.height === defaults.height);
+  if (isDefaultSize) {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const scaleFactor = primaryDisplay.scaleFactor || 1;
+    if (scaleFactor > 1) {
+      // Scale down the logical window size so it fits comfortably on screen.
+      // Without this, a 480×760 window at scaleFactor=1.75 occupies 840×1330
+      // physical pixels, which overflows most laptop screens.
+      const safeW = Math.round(defaults.width  / scaleFactor);
+      const safeH = Math.round(defaults.height / scaleFactor);
+      const wa = primaryDisplay.workAreaSize;
+      bounds = {
+        ...bounds,
+        width:  Math.min(safeW, wa.width  - 40),
+        height: Math.min(safeH, wa.height - 40),
+      };
+    }
+  }
+
   const useSavedPosition = isPositionVisible(bounds);
 
   mainWindow = new BrowserWindow({
@@ -153,7 +179,24 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  mainWindow.webContents.setZoomFactor(store.get('zoomFactor'));
+
+  // Auto-adjust the default zoom for high-DPI screens (Windows display
+  // scaling > 100%). The stored zoom of 1.6 was tuned for 100% scaling;
+  // at 175% it would render everything ~2.8× larger than designed.
+  // We compensate ONLY if the zoom is still at the factory default (1.6),
+  // meaning the user never touched it — their own choice is always kept.
+  {
+    const ZOOM_DEFAULT = 1.6;
+    let zoom = store.get('zoomFactor');
+    if (zoom === ZOOM_DEFAULT) {
+      const sf = (screen.getPrimaryDisplay().scaleFactor) || 1;
+      if (sf > 1) {
+        zoom = clampZoom(ZOOM_DEFAULT / sf);
+        store.set('zoomFactor', zoom);
+      }
+    }
+    mainWindow.webContents.setZoomFactor(zoom);
+  }
 
   // Show the app name + version in the real window title, since the
   // in-page title bar no longer shows a visible "Simple Player" label.

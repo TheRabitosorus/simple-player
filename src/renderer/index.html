@@ -58,7 +58,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .view.active{display:flex;}
 
 /* -- Player view -- */
-#npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transition:background 1s ease;}
+/* #npBackground = couche transform (animation dérive)
+   #npBgInner    = couche filter blur — séparées pour que Chromium
+                   n'annule pas l'animation quand filter est présent */
+#npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transition:background 1s ease;transform-origin:center center;}
+#npBgInner{position:absolute;inset:0;background-size:cover;background-position:center;transform-origin:center center;}
 @keyframes bgDrift{
   0%  {transform:scale(1.2) translate(0%,0%);}
   25% {transform:scale(1.25) translate(1.5%,-1%);}
@@ -449,7 +453,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     <!-- Lecture -->
     <section id="view-player" class="view active">
-      <div id="npBackground"></div>
+      <div id="npBackground"><div id="npBgInner"></div></div>
       <span id="playlistBadge" class="playlist-badge" hidden></span>
       <div id="swipeZone">
         <div id="likedBadge" class="liked-badge" title="Not liked">
@@ -989,17 +993,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   var $npBackground = document.getElementById('npBackground');
+  var $npBgInner    = document.getElementById('npBgInner');
+  var _bgAnimApplied = false;
   function applyBgAnimation(){
-    $npBackground.classList.toggle('bg-animated', !!(settings.bgEnabled && settings.bgAnimated));
-    // Re-trigger the animation when toggled on so it starts from the keyframe 0.
-    if (settings.bgEnabled && settings.bgAnimated){
-      $npBackground.style.animation = 'none';
-      $npBackground.offsetHeight; // force reflow
-      $npBackground.style.animation = '';
-    }
+    var want = !!(settings.bgEnabled && settings.bgAnimated);
+    if (want === _bgAnimApplied) return;
+    _bgAnimApplied = want;
+    // Animation sur le parent (#npBackground, sans filter)
+    $npBackground.classList.toggle('bg-animated', want);
+    // Transform statique sur l'enfant quand pas animé
+    $npBgInner.style.transform = want ? '' : 'scale(1.2)';
   }
   function updateNpBackground(){
-    if (!settings.bgEnabled){ $npBackground.style.background = 'var(--bg)'; applyBgAnimation(); return; }
+    if (!settings.bgEnabled){ $npBackground.style.background = 'var(--bg)'; $npBgInner.style.backgroundImage = 'none'; $npBgInner.style.filter = ''; applyBgAnimation(); return; }
     var t = currentTrack(); if (!t) return;
     var seed = t.id + ':' + t.title;
     if (!hueCache[seed]) makeArt(seed);
@@ -1858,15 +1864,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   wirePillGroup('bgToggleGroup', settings.bgEnabled ? 'on' : 'off', function(v){
     settings.bgEnabled = (v === 'on');
     document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
-    updateNpBackground();
+    // In real-playback mode, use the cached art URL to restore the background.
+    if (useRealPlayback && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
+    else updateNpBackground();
   });
   document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
 
   wirePillGroup('bgAnimGroup', settings.bgAnimated ? 'on' : 'off', function(v){
     settings.bgAnimated = (v === 'on');
-    // When switching to animated, drop the static inline transform so the
-    // CSS keyframe takes over; restore it when switching back.
-    if (!settings.bgAnimated) $npBackground.style.transform = 'scale(1.2)';
     applyBgAnimation();
   });
 
@@ -2707,16 +2712,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }).catch(function(){});
   }
 
+  var _lastArtUrl = '';
   function updateNpBackgroundReal(artUrl){
-    if (!settings.bgEnabled || !artUrl){ $npBackground.style.background = 'var(--bg)'; $npBackground.style.backgroundImage = 'none'; applyBgAnimation(); return; }
-    $npBackground.style.backgroundImage = cssUrl(artUrl);
-    $npBackground.style.backgroundSize = 'cover';
-    $npBackground.style.backgroundPosition = 'center';
-    $npBackground.style.filter = 'blur(60px) brightness(.45)';
-    // transform is now handled by CSS animation when bgAnimated is on;
-    // only set it statically when the animation is off.
-    if (!settings.bgAnimated) $npBackground.style.transform = 'scale(1.2)';
-    else $npBackground.style.transform = '';
+    if (artUrl) _lastArtUrl = artUrl;
+    if (!settings.bgEnabled || !artUrl){
+      $npBackground.style.background = 'var(--bg)';
+      $npBgInner.style.backgroundImage = 'none';
+      $npBgInner.style.filter = '';
+      applyBgAnimation();
+      return;
+    }
+    // $npBgInner porte l'image et le filtre blur
+    // $npBackground porte l'animation transform (sans filter — sinon Chromium bloque l'animation)
+    $npBackground.style.background = 'none';
+    $npBgInner.style.backgroundImage = cssUrl(artUrl);
+    $npBgInner.style.backgroundSize = 'cover';
+    $npBgInner.style.backgroundPosition = 'center';
+    $npBgInner.style.filter = 'blur(60px) brightness(.45)';
+    $npBgInner.style.transform = 'scale(1.2)'; // toujours scale sur l'inner (compense le inset:0)
     applyBgAnimation();
   }
 

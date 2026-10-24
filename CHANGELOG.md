@@ -2,6 +2,19 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.40 — 24 octobre 2026
+
+- **Mise à l'échelle Windows (DPI scaling).** À 175 % (ou tout autre scaling > 100 %), la fenêtre et le zoom s'adaptent automatiquement au premier lancement. La taille par défaut (480×760) est divisée par le `scaleFactor` de l'écran principal, et le zoom par défaut (1.6) est réduit proportionnellement, afin que l'interface garde les mêmes proportions visuelles quelle que soit la mise à l'échelle Windows. Si l'utilisateur a déjà personnalisé la taille ou le zoom, ses réglages sont toujours respectés.
+
+## v1.20.39 — 24 octobre 2026
+
+- **Animated Background — fix définitif.** Chromium/Electron bloque les animations `transform` sur un élément qui porte aussi un `filter` inline. Solution : architecture à deux couches — `#npBackground` (parent) reçoit uniquement l'animation `transform`, `#npBgInner` (enfant) reçoit l'image, le `blur` et le `brightness`. Les deux ne se partagent plus aucune propriété conflictuelle.
+
+## v1.20.38 — 24 octobre 2026
+
+- **Animated Background — fix animation bloquée.** L'animation `bgDrift` ne démarrait pas parce qu'un `transform: scale(1.2)` inline posé par le rendu du fond prenait la priorité sur l'animation CSS. Désormais, passer Animated Background à On vide ce style inline, et l'état `_bgAnimApplied` évite de relancer l'animation à chaque mise à jour du fond (ce qui la réinitialisait en boucle toutes les 2 s).
+- **Background On/Off — fond noir persistant (fix).** Repasser Background de Off à On laissait un fond noir dans le mode real playback, car `updateNpBackground()` ne connaissait pas l'URL de la pochette courante. La dernière URL est maintenant mémorisée dans `_lastArtUrl` et réutilisée immédiatement lors du toggle.
+
 ## v1.20.37 — 24 octobre 2026
 
 - **Animated Background.** Nouvelle option dans les Settings (visible uniquement si Background est On). Active une animation lente sur le fond flou — zoom et dérive très légers (cycle de 40 s) qui donnent un effet de mouvement d'eau subtil. L'option Animated Background se masque automatiquement si Background est désactivé.
