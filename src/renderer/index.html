@@ -153,17 +153,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;padding-left:20px;padding-top:20px;}
 /* The idle-mode volume bar lives INSIDE #idleVolumeZone, centred in the strip. */
-/* Idle volume slider — toujours visible en mode idle, style référence image */
-#idleVolIcon{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:26px;height:26px;color:rgba(255,255,255,.55);opacity:0;transition:opacity .22s ease;}
+#idleVolIcon{position:absolute;top:-38px;left:50%;transform:translateX(-50%);width:28px;height:28px;color:var(--fg-dim);}
 #idleVolIcon svg{width:100%;height:100%;}
-#app.idle #idleVolIcon{opacity:1;}
-#idleVolBar{position:absolute;width:4px;left:50%;transform:translateX(-50%);top:54px;bottom:52px;background:rgba(255,255,255,.18);border-radius:4px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
-#app.idle #idleVolBar{opacity:1;}
-#idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;background:#1db954;}
-#idleVolThumb{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 2px 8px rgba(0,0,0,.6);transition:box-shadow .1s ease;}
-#app.idle.vol-dragging #idleVolThumb{box-shadow:0 2px 14px rgba(29,185,84,.5);}
-#idleVolLabel{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:15px;font-weight:600;color:rgba(255,255,255,.45);white-space:nowrap;opacity:0;transition:opacity .22s ease;}
-#app.idle #idleVolLabel{opacity:1;}
+#idleVolBar{position:absolute;width:5px;top:5%;bottom:5%;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
+#app.idle.volume-revealed #idleVolBar{opacity:1;}
+#idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;background:var(--accent);}
+#idleVolThumb{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 1px 6px rgba(0,0,0,.5);}
+#idleVolLabel{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);font-size:24px;font-weight:700;color:var(--fg-dim);white-space:nowrap;}
 #art{transition:width var(--morph-dur) var(--morph-ease), height var(--morph-dur) var(--morph-ease), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
@@ -563,18 +559,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
            (pointer-events:none) outside idle mode, where the always-
            visible rail's own controls handle things as usual. -->
       <div id="idleVolumeZone">
-        <div id="idleVolIcon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-          </svg>
-        </div>
         <div id="idleVolBar" aria-hidden="true">
+          <div id="idleVolIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></div>
           <div id="idleVolFill"></div>
           <div id="idleVolThumb"></div>
+          <span id="idleVolLabel"></span>
         </div>
-        <span id="idleVolLabel"></span>
       </div>
     </section>
 
@@ -1713,13 +1703,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }, 2500);
     }
 
-    // Expose pour le wheel handler et l'entrée idle.
+    // Expose for the wheel handler (defined earlier in outer scope).
     showIdleVolumeBar = function(){
       if (!isIdle()) return;
+      app.classList.add('volume-revealed');
       updateIdleBar();
     };
-    // Appelé aussi à chaque mise à jour de volume (state change)
-    window._updateIdleVolumeBar = updateIdleBar;
+    scheduleIdleVolumeHide = function(){
+      if (!isIdle()) return;
+      scheduleHide();
+    };
     scheduleIdleVolumeHide = function(){
       if (!isIdle()) return;
       scheduleHide();
@@ -1730,11 +1723,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Let taps on the liked badge pass through even though the volume zone
       // now covers the full height of the swipeZone.
       if (e.target.closest('#likedBadge')) return;
-      // Mettre à jour le bar au début du drag
-      updateIdleBar();
+      // Reveal the bar if not already shown, then start drag immediately —
+      // even on the first touch so tap-and-drag works in one gesture.
+      if (!app.classList.contains('volume-revealed')){
+        app.classList.add('volume-revealed');
+        updateIdleBar();
+      }
       dragging = true; pid = e.pointerId;
       startY = e.clientY; startVolume = state.volume;
-      app.classList.add('vol-dragging');
       try { zone.setPointerCapture(pid); } catch(err){}
       scheduleHide();
       e.preventDefault();
@@ -1754,7 +1750,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function endDrag(){
       if (!dragging) return;
       dragging = false;
-      app.classList.remove('vol-dragging');
       scheduleHide();
     }
     zone.addEventListener('pointerup', endDrag);
@@ -1805,7 +1800,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       render();
       notifyVolumeChange();
     });
-    updateVolumeDisplay = function(){ render(); if (window._updateIdleVolumeBar) window._updateIdleVolumeBar(); };
+    updateVolumeDisplay = render; // shared with the swipe-up/down-on-art volume gesture
     render();
   })();
 
@@ -2049,7 +2044,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           app.classList.add('idle');
           fitArtSquare(); // immediate pass for size
           setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
-          if (window._updateIdleVolumeBar) window._updateIdleVolumeBar();
         }
       }, settings.idleDelay);
     }

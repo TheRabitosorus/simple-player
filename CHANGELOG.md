@@ -6,7 +6,7 @@ Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle ver
 
 - **Zones idle — exactement comme l'image de référence.** La zone jaune (swipe-up pour quitter le mode idle) est maintenant restreinte au-dessous de la pochette : la position de départ du geste (`startYInZone`) doit être plus basse que `_idleArtBottom` (calculé par `fitArtSquare`). Avant, le swipe-up fonctionnait depuis n'importe où dans `#swipeZone`.
 - **Background canvas moins lumineux.** Les blobs canvas étaient trop vifs (teintes jaune/brun). Alpha réduit (0.75→0.45, 0.35→0.18) et assombrissement global renforcé (0.45→0.65). Résultat : fond très discret, ambiance sombre.
-- **Slider volume idle redesigné.** Le slider vertical en mode idle adopte le style de l'image de référence : toujours visible dès l'entrée en idle (plus de tap pour révéler), icône volume en haut, track gris foncé (4 px), portion remplie en vert (#1db954), thumb blanc (18 px) avec glow vert pendant le drag, pourcentage en bas. Le fill se met à jour en temps réel lors des changements de volume depuis n'importe quelle source.
+- **Slider volume idle plus long.** Le track vertical en mode idle s'étend maintenant de 5% à 95% de la hauteur de la zone orange (quasi pleine hauteur), au lieu de 15%–85%. Comportement inchangé.
 
 ## v1.20.60 — 24 octobre 2026
 
