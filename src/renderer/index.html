@@ -286,8 +286,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
 #app.idle #addToLibraryWrap{position:absolute;left:0;right:0;display:flex;justify-content:center;}
-#app.idle .add-btn{width:312px;height:312px;border-radius:50%;}
-#app.idle .add-btn svg{width:132px;height:132px;}
+#app.idle .add-btn{width:94px;height:94px;border-radius:50%;}
+#app.idle .add-btn svg{width:40px;height:40px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -611,17 +611,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   <nav id="tabbar">
     <div class="px">
-      <button class="tab" data-view="library">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
-        <span>Library</span>
+      <button class="tab" data-view="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search</span>
       </button>
       <button class="tab active" data-view="player">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         <span>Player</span>
       </button>
-      <button class="tab" data-view="search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <span>Search</span>
+      <button class="tab" data-view="library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
+        <span>Library</span>
       </button>
     </div>
     <button class="tabbar-gear" id="settingsBtn" data-view="settings" title="Settings" aria-label="Settings">
@@ -1005,7 +1005,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           ? $artist.getBoundingClientRect().bottom - swRect.top
           : artBotInSw;
         var spaceBelow = swRect.height - artistBotInSw;
-        var btnH = 312; // idle button is 6× (312px)
+        var btnH = 94; // idle button (94px)
         var btnTop = artistBotInSw + Math.round((spaceBelow - btnH) / 2);
         $addWrap.style.top = Math.round(Math.max(artistBotInSw + 8, btnTop)) + 'px';
       }

@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.14 — 23 octobre 2026
+
+- **Mode idle — bouton + réduit à 30%.** 94px (était 312px), icône 40px.
+
+## v1.20.13 — 23 octobre 2026
+
+- **Tabbar — ordre final.** Search | Player | Library.
+
 ## v1.20.12 — 23 octobre 2026
 
 - **Quit — Ghost Spotify toujours fermé.** Quand le Ghost Spotify est activé dans les settings, Spotify est maintenant tué à chaque fermeture de Simple Player — même s'il était déjà ouvert au lancement. La musique s'arrête garantiment.
