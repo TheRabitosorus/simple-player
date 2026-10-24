@@ -2,6 +2,15 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.59 — 24 octobre 2026
+
+- **Background : animation organique.** Remplacement du drift linéaire par deux animations CSS indépendantes jouées simultanément — `bgDriftMove` (déplacement spatial + scale) et `bgDriftPos` (variation de `background-position` qui morphe les couleurs du blur). Les durées sont des multiples non-entiers l'une de l'autre, donc les cycles ne se synchronisent jamais et le mouvement paraît aléatoire.
+
+## v1.20.58 — 24 octobre 2026
+
+- **Background animé persisté.** `bgEnabled` et `bgAnimated` étaient en RAM pure — à chaque lancement l'animation revenait à `off`. Maintenant sauvegardés dans `localStorage` (`sp_settings`) et restaurés au démarrage. Le choix de vitesse (normal/medium/fast) survit aux relances.
+- **Animation forcée au démarrage.** Ajout d'un reflow (`void offsetWidth`) avant de reposer la classe `bg-animated`, pour que Chromium rejoue l'animation depuis 0% au lieu de la laisser figée.
+
 ## v1.20.57 — 24 octobre 2026
 
 - **Idle : zone volume corrigée en hauteur.** La zone orange s'arrête maintenant au bas de la pochette (plus de chevauchement avec la zone jaune). Calcul via `offsetTop`/`offsetHeight` — cohérent avec la correction horizontale de la v1.20.56. La zone jaune (swipe) couvre bien toute la largeur sous la pochette.

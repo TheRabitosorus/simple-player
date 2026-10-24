@@ -64,15 +64,35 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    #npBgInner    = couche filter blur — séparées pour que Chromium
                    n'annule pas l'animation quand filter est présent */
 #npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transform-origin:center center;overflow:hidden;}
-#npBgInner{position:absolute;inset:0;background-size:cover;background-position:center;transform-origin:center center;}
-@keyframes bgDrift{
-  0%  {transform:scale(1.2) translate(0%,0%);}
-  25% {transform:scale(1.25) translate(1.5%,-1%);}
-  50% {transform:scale(1.22) translate(-1%,1.5%);}
-  75% {transform:scale(1.27) translate(-1.5%,-0.5%);}
-  100%{transform:scale(1.2) translate(0%,0%);}
+#npBgInner{position:absolute;inset:-8%;background-size:cover;background-position:center;transform-origin:center center;}
+/* Deux animations indépendantes jouées simultanément sur #npBgInner :
+   bgDriftPos  : déplace le background-position (morphe les couleurs du blur)
+   bgDriftMove : déplace + scale le layer entier (drift spatial)
+   Les durées sont non-multiples pour que les cycles ne se synchronisent jamais → effet aléatoire. */
+@keyframes bgDriftPos{
+  0%   {background-position:50% 50%;}
+  17%  {background-position:55% 44%;}
+  34%  {background-position:43% 57%;}
+  51%  {background-position:58% 52%;}
+  68%  {background-position:46% 41%;}
+  85%  {background-position:53% 61%;}
+  100% {background-position:50% 50%;}
 }
-#npBackground.bg-animated #npBgInner{animation:bgDrift var(--bg-anim-dur,40s) ease-in-out infinite;}
+@keyframes bgDriftMove{
+  0%   {transform:scale(1.18) translate(0%,   0%);}
+  13%  {transform:scale(1.22) translate(-2.5%, 1.5%);}
+  29%  {transform:scale(1.20) translate(1.8%, -2.2%);}
+  47%  {transform:scale(1.25) translate(-1.2%, 2.8%);}
+  61%  {transform:scale(1.19) translate(2.6%,  1%);}
+  78%  {transform:scale(1.23) translate(-0.8%,-2.5%);}
+  91%  {transform:scale(1.21) translate(1.5%,  0.8%);}
+  100% {transform:scale(1.18) translate(0%,   0%);}
+}
+#npBackground.bg-animated #npBgInner{
+  animation:
+    bgDriftMove var(--bg-anim-dur, 38s) ease-in-out infinite,
+    bgDriftPos  calc(var(--bg-anim-dur, 38s) * 0.73) ease-in-out infinite;
+}
 #swipeZone{position:relative;
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -924,6 +944,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     bgAnimated: 'off', // 'off' | 'normal' | 'medium' | 'fast'
     startup: false
   };
+  // Restaure les settings persistés dans localStorage (survit aux relances).
+  try {
+    var _saved = JSON.parse(localStorage.getItem('sp_settings') || '{}');
+    if (typeof _saved.bgEnabled === 'boolean') settings.bgEnabled = _saved.bgEnabled;
+    if (_saved.bgAnimated) settings.bgAnimated = _saved.bgAnimated;
+    if (_saved.idleDelay)  settings.idleDelay  = _saved.idleDelay;
+  } catch (e) {}
   var RAIL_PRESETS = {
     normal: { rail: '68px', track: '9px' },
     large:  { rail: '84px', track: '16px' },
@@ -1046,8 +1073,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (want){
       // Durée via custom property sur l'élément
       $npBackground.style.setProperty('--bg-anim-dur', BG_SPEEDS[speed] || '40s');
+      // Effacer d'abord le transform inline pour que la keyframe puisse démarrer proprement.
+      // Retire + repose la classe pour forcer Chromium à rejouer l'animation depuis 0%.
+      $npBgInner.style.transform = '';
+      $npBackground.classList.remove('bg-animated');
+      void $npBackground.offsetWidth; // force reflow — garantit que Chromium redémarre l'animation
       $npBackground.classList.add('bg-animated');
-      $npBgInner.style.transform = ''; // laisse l'animation CSS prendre le dessus
     } else {
       $npBackground.classList.remove('bg-animated');
       $npBackground.style.removeProperty('--bg-anim-dur');
@@ -1978,8 +2009,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     document.documentElement.style.setProperty('--vol-track-w', preset.track);
   });
 
+  function saveSettings(){
+    try { localStorage.setItem('sp_settings', JSON.stringify({
+      bgEnabled:  settings.bgEnabled,
+      bgAnimated: settings.bgAnimated,
+      idleDelay:  settings.idleDelay
+    })); } catch(e) {}
+  }
+
   wirePillGroup('bgToggleGroup', settings.bgEnabled ? 'on' : 'off', function(v){
     settings.bgEnabled = (v === 'on');
+    saveSettings();
     document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
     // In real-playback mode, use the cached art URL to restore the background.
     if (useRealPlayback && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
@@ -1989,6 +2029,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   wirePillGroup('bgAnimGroup', settings.bgAnimated || 'off', function(v){
     settings.bgAnimated = v; // 'off' | 'normal' | 'medium' | 'fast'
+    saveSettings();
     _bgAnimApplied = null; // force re-apply even if same on/off state
     applyBgAnimation();
   });
