@@ -2,6 +2,29 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.7 — 23 octobre 2026
+
+- **Mode idle — titre et artiste deux fois plus grands.** Titre jusqu'à 56px (était 28px), artiste jusqu'à 32px (était 14px).
+- **Mode idle — zone tactile volume corrigée.** La zone d'activation s'étend maintenant correctement de la droite de la pochette jusqu'au bord droit de l'application.
+- **Mode idle — barre de volume centrée.** La barre s'affiche exactement au milieu de l'espace disponible à droite de la pochette.
+
+## v1.20.6 — 23 octobre 2026
+
+- **Swipe Previous plus réactif.** Trois améliorations combinées : (1) le délai avant le 2e appel "previous" à Spotify réduit de 350ms à 200ms ; (2) `pollSoon` vérifie maintenant à 0ms + 800ms + 1800ms au lieu de 0ms + 1600ms, donc la pochette se met à jour beaucoup plus vite après confirmation Spotify ; (3) les 6 dernières pochettes de l'historique sont préchargées au démarrage (au lieu de 3) pour que l'image s'affiche instantanément sans attendre le réseau.
+
+## v1.20.5 — 23 octobre 2026
+
+- **Boutons Next/Prev tactile : fond fantôme corrigé.** Le rond noir restait affiché après un tap. Les effets `:hover` sont maintenant limités aux vrais pointeurs souris (`@media (hover: hover)`) — sur écran tactile, seul `:active` (pendant l'appui) s'affiche, et il disparaît correctement au relâchement.
+
+## v1.20.4 — 23 octobre 2026
+
+- **Mode normal — titre/artiste centré.** Le bloc titre+artiste occupe maintenant tout l'espace entre la pochette et la barre de progression, et est centré verticalement dedans.
+- **Mode idle — bouton + repositionné.** Centré entre le bas du nom d'artiste et le bas de l'application (via positionnement JS absolu).
+
+## v1.20.3 — 23 octobre 2026
+
+- **Volume idle : zone d'activation élargie.** Tout l'espace entre la pochette et le bord droit de l'application active maintenant la barre de volume. La barre est centrée dans cet espace.
+
 ## v1.20.2 — 23 octobre 2026
 
 - **Bouton repeat : répète la chanson en cours** (au lieu de répéter la playlist entière). L'API Spotify reçoit maintenant `track` au lieu de `context`.
