@@ -617,16 +617,35 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('before-quit', () => {
-  isQuitting = true;
+// Tracks whether we already sent the quit signal to the renderer to avoid
+// re-entrant calls (before-quit fires once but we replace it with a delayed
+// re-emit, so we guard with this flag).
+let quitSignalSent = false;
+
+app.on('before-quit', (event) => {
   // Belt-and-suspenders: save the current bounds here too, in case the
   // window is torn down by this quit sequence before its own 'close'
   // handler gets a clean chance to run (e.g. Windows session logoff/shutdown).
   clearTimeout(saveBoundsTimer);
   saveBounds();
-  // Only closes the Spotify instance Simple Player itself launched this
-  // session — never one the user already had open before starting Simple
-  // Player.
+
+  if (!quitSignalSent && mainWindow && !mainWindow.isDestroyed()) {
+    // First pass: tell the renderer to pause Spotify, then re-emit quit
+    // after a short delay so the pause request has time to reach the server.
+    event.preventDefault();
+    quitSignalSent = true;
+    isQuitting = true;
+    mainWindow.webContents.send('app:will-quit');
+    setTimeout(() => {
+      killGhostSpotifyIfAny();
+      stopVolumeHelper();
+      app.quit();
+    }, 800);
+    return;
+  }
+
+  // Second pass (or no window): proceed normally.
+  isQuitting = true;
   killGhostSpotifyIfAny();
   stopVolumeHelper();
 });

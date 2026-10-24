@@ -2,6 +2,24 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.2 — 23 octobre 2026
+
+- **Bouton repeat : répète la chanson en cours** (au lieu de répéter la playlist entière). L'API Spotify reçoit maintenant `track` au lieu de `context`.
+- **Fermeture : pause automatique.** La musique Spotify s'arrête proprement quand on quitte Simple Player.
+- **Shuffle** : vérifié — envoie bien `true/false` à l'API Spotify, qui gère le hasard côté serveur.
+
+## v1.20.1 — 23 octobre 2026
+
+- **Titre/artiste : marge minimale sous la pochette.** Un `margin-top` garanti évite que le texte ne remonte sur la pochette sur les petites fenêtres.
+
+## v1.20.0 — 23 octobre 2026
+
+- **Bouton + en idle : même position qu'en mode normal.** Centré sous le titre/artiste dans le flux de la page, au lieu d'être repositionné à droite.
+
+## v1.19.9 — 23 octobre 2026
+
+- **Symbole pause en vert sur la pochette.** Le ⏸ était noir (SVG fill par défaut) — corrigé, il hérite maintenant de la couleur accent (vert) comme le ▶.
+
 ## v1.19.8 — 23 octobre 2026
 
 - **Bouton + visible en mode idle.** Positionné à droite, centré verticalement dans l'espace entre le haut de la pochette et le haut de l'app.

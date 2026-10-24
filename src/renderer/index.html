@@ -90,7 +90,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;padding:0;pointer-events:none;}
 #app.idle #transport{opacity:0;max-height:0;margin:0;pointer-events:none;}
-#app.idle #addToLibraryWrap{opacity:1;max-height:none;margin:0;pointer-events:auto;position:absolute;z-index:3;}
+#app.idle #addToLibraryWrap{opacity:1;max-height:none;margin:0;pointer-events:auto;}
 /* Hidden off to the right (not just faded out) while idle, but NOT inert:
    pointer-events stays enabled so a single tap here — the space between
    the cover art and the window's edge — is caught (see JS) even though
@@ -151,7 +151,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #art.flash .art-overlay{opacity:1;background:rgba(0,0,0,.28);transition:opacity .1s ease, background .1s ease;}
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
-#trackInfo{text-align:center;max-width:min(80vw,420px);}
+#trackInfo{text-align:center;max-width:min(80vw,420px);margin-top:max(12px,2vh);}
 #trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -397,7 +397,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         <div id="artWrap">
           <div id="art">
             <div class="art-overlay" id="artOverlay">
-              <svg id="artOverlayIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+              <svg id="artOverlayIcon" viewBox="0 0 24 24" fill="currentColor"></svg>
             </div>
           </div>
         </div>
@@ -963,8 +963,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
     // Position the liked badge and + button centred in the space above the cover in idle mode.
     var $lb = document.getElementById('likedBadge');
-    var $addWrap = document.getElementById('addToLibraryWrap');
-    if ($lb || $addWrap) {
+    if ($lb) {
       if (isIdle) {
         var swEl = $artWrap.parentElement; // #swipeZone
         var swRect = swEl.getBoundingClientRect();
@@ -977,21 +976,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           var badgeH = 44;
           $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2)) + 'px';
         }
-        if ($addWrap) {
-          var btnH = 52;
-          // Place the + button to the right of centre (mirror of the badge which is left-of-centre)
-          $addWrap.style.position = 'absolute';
-          $addWrap.style.top = Math.round(Math.max(4, zoneCenter - btnH / 2)) + 'px';
-          $addWrap.style.left = '';
-          $addWrap.style.right = '80px'; // clear of the volume strip
-        }
       } else {
         if ($lb) $lb.style.top = '';
-        if ($addWrap) {
-          $addWrap.style.position = '';
-          $addWrap.style.top = '';
-          $addWrap.style.right = '';
-        }
       }
     }
   }
@@ -1145,7 +1131,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function toggleRepeat(){
     if (useRealPlayback){
       var isOn = $repeatBtn.classList.contains('on');
-      var newState = isOn ? 'off' : 'context';
+      var newState = isOn ? 'off' : 'track';
       $repeatBtn.classList.toggle('on', !isOn);
       lastRepeatChangeAt = Date.now();
       spotifyApi('/me/player/repeat?state=' + newState, { method: 'PUT' }).catch(function(err){
@@ -2771,6 +2757,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     window.simplePlayer.onTogglePlay(function(){ togglePlay(); });
     window.simplePlayer.onPreviousTrack(function(){ prev(); });
     window.simplePlayer.onNextTrack(function(){ next(); });
+    // Pause Spotify just before the app exits so the music stops.
+    window.simplePlayer.onAppWillQuit(function(){
+      if (useRealPlayback && state.playing){
+        spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){});
+      }
+    });
   }
 
   // ---------------- Init ----------------
