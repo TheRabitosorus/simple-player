@@ -26,6 +26,8 @@
   --mono-font: 'JetBrains Mono', ui-monospace, Menlo, monospace;
   --rail-w: 68px;
   --vol-track-w: 9px;
+  --morph-dur: .6s;
+  --morph-ease: cubic-bezier(.4,0,.2,1);
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
@@ -89,23 +91,55 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Mode immersif (3s sans interaction) ---------- */
 /* Reste visible : tique "liké", pastille playlist, titre + artiste. Le reste s'efface. */
-/* Smooth idle ↔ normal transition: the whole swipeZone scales slightly so
-   the cover zoom feels organic rather than a jump. The art itself already
-   animates its width/height; the scale here bridges the gap between those
-   two states while the layout reflows. */
-#swipeZone{transform-origin:center center;transition:padding .35s ease, transform .35s cubic-bezier(.22,.61,.36,1);}
-#app.idle #swipeZone{transform:scale(1);}   /* idle: full size */
-/* When transitioning INTO idle we briefly boost scale then settle.
-   Done with a tiny CSS animation so we don't need JS to toggle a class. */
-@keyframes idleEnter{0%{transform:scale(.96);}100%{transform:scale(1);}}
-@keyframes idleLeave{0%{transform:scale(1.04);}100%{transform:scale(1);}}
-#app.idle-enter #swipeZone{animation:idleEnter .35s cubic-bezier(.22,.61,.36,1) forwards;}
-#app.idle-leave #swipeZone{animation:idleLeave .35s cubic-bezier(.22,.61,.36,1) forwards;}
-#tabbar{transition:opacity .4s ease, max-height .4s ease, padding .4s ease, border-color .4s ease;max-height:160px;overflow:hidden;}
-#progressWrap,#transport{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;overflow:hidden;}
-#addToLibraryWrap{transition:opacity .35s ease, max-height .35s ease, margin .35s ease;}
+/* ---- Morph idle ↔ normal ----
+   All elements share the same 600 ms "emphasized" easing so the entire UI
+   moves as one piece rather than fading independently.
+   Controls slide down+fade on idle enter, slide up+fade on idle leave.
+   Title/artist font-size interpolates smoothly (no jump).
+   Art width/height already animate; padding transition centres it live. */
+#swipeZone{
+  transform-origin:center center;
+  transition:padding var(--morph-dur) var(--morph-ease),
+             transform var(--morph-dur) var(--morph-ease);
+}
+#app.idle #swipeZone{transform:scale(1);}
+/* Scale pulse is now handled by transform on swipeZone itself (no keyframe needed
+   for scale), but we keep a gentle translate nudge for the "pop" feel */
+@keyframes idleEnter{0%{transform:translateY(8px) scale(.97);}100%{transform:translateY(0) scale(1);}}
+@keyframes idleLeave{0%{transform:translateY(-6px) scale(1.02);}100%{transform:translateY(0) scale(1);}}
+#app.idle-enter #swipeZone{animation:idleEnter var(--morph-dur) var(--morph-ease) forwards;}
+#app.idle-leave #swipeZone{animation:idleLeave var(--morph-dur) var(--morph-ease) forwards;}
+
+/* Tab bar: fade + slide down into floor */
+#tabbar{
+  transition:opacity var(--morph-dur) var(--morph-ease),
+             max-height var(--morph-dur) var(--morph-ease),
+             padding var(--morph-dur) var(--morph-ease),
+             border-color var(--morph-dur) var(--morph-ease),
+             transform var(--morph-dur) var(--morph-ease);
+  max-height:160px;overflow:hidden;transform:translateY(0);
+}
+#app.idle #tabbar{transform:translateY(24px);}
+#app.idle-leave #tabbar{transform:translateY(0) !important;}
+
+/* Progress + transport: fade + slide down together */
+#progressWrap,#transport{
+  transition:opacity var(--morph-dur) var(--morph-ease),
+             max-height var(--morph-dur) var(--morph-ease),
+             margin var(--morph-dur) var(--morph-ease),
+             transform var(--morph-dur) var(--morph-ease);
+  overflow:hidden;transform:translateY(0);
+}
+#app.idle #progressWrap,#app.idle #transport{transform:translateY(32px);}
+#app.idle-leave #progressWrap,#app.idle-leave #transport{transform:translateY(0) !important;}
+
+#addToLibraryWrap{
+  transition:opacity var(--morph-dur) var(--morph-ease),
+             max-height var(--morph-dur) var(--morph-ease),
+             margin var(--morph-dur) var(--morph-ease);
+}
 #app.idle #addToLibraryWrap{overflow:hidden;}
-#volumeRail{transition:opacity .35s ease, transform .35s ease;}
+#volumeRail{transition:opacity var(--morph-dur) var(--morph-ease), transform var(--morph-dur) var(--morph-ease);}
 /* Left is set from JS (tracks the cover art's right edge); inert outside
    idle mode so it never competes with the always-visible rail's own
    controls or anything else. */
@@ -134,7 +168,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;background:var(--accent);}
 #idleVolThumb{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 1px 6px rgba(0,0,0,.5);}
 #idleVolLabel{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);font-size:24px;font-weight:700;color:var(--fg-dim);white-space:nowrap;}
-#art{transition:width .7s cubic-bezier(.22,.61,.36,1), height .7s cubic-bezier(.22,.61,.36,1), transform .25s ease, opacity .25s ease;}
+#art{transition:width var(--morph-dur) var(--morph-ease), height var(--morph-dur) var(--morph-ease), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
 @keyframes swipeNext{0%{transform:translateX(0);opacity:1;}45%{transform:translateX(-26px);opacity:.4;}46%{transform:translateX(26px);}100%{transform:translateX(0);opacity:1;}}
@@ -186,11 +220,26 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #art.flash .art-overlay{opacity:1;background:rgba(0,0,0,.28);transition:opacity .1s ease, background .1s ease;}
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
-#trackInfo{text-align:center;max-width:min(80vw,420px);flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;}
+#trackInfo{
+  text-align:center;max-width:min(80vw,420px);flex:1 1 auto;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;
+  transition:max-width var(--morph-dur) var(--morph-ease),
+             flex var(--morph-dur) var(--morph-ease),
+             margin var(--morph-dur) var(--morph-ease);
+}
 #app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-29px;padding-bottom:0;}
-#trackTitle{font-family:var(--display-font);font-weight:600;font-style:italic;font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-#trackArtist{margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#trackTitle{
+  font-family:var(--display-font);font-weight:600;font-style:italic;
+  font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:font-size var(--morph-dur) var(--morph-ease),
+             margin var(--morph-dur) var(--morph-ease);
+}
+#trackArtist{
+  margin:0;color:var(--fg-dim);font-size:14px;font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:font-size var(--morph-dur) var(--morph-ease);
+}
 #app.idle #trackTitle{font-size:clamp(36px,6vw,56px);margin-bottom:8px;}
 #app.idle #trackArtist{font-size:clamp(22px,3.5vw,32px);}
 
@@ -1081,20 +1130,35 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // entry/exit, resize, zoom, tab switches all already call this).
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
-      // The activation zone covers the gap between the right edge of the
-      // cover art and the right edge of the swipeZone, but only vertically
-      // from the top of the art to the BOTTOM of the art — not lower, so the
-      // + button corner stays clear of the volume zone.
-      var artRect = $art.getBoundingClientRect();
-      var swRect2 = ($artWrap.closest('#swipeZone') || document.body).getBoundingClientRect();
-      var gapLeft = Math.round(artRect.right - swRect2.left) + 8;
-      var artTopInSw2 = Math.round(artRect.top - swRect2.top);
-      var artBotInSw2 = Math.round(artRect.bottom - swRect2.top);
-      idleZone.style.left = gapLeft + 'px';
-      idleZone.style.right = '0';
-      idleZone.style.width = '';
-      idleZone.style.top = artTopInSw2 + 'px';
-      idleZone.style.bottom = (swRect2.height - artBotInSw2) + 'px';
+      // The activation zone covers only the gap between the RIGHT edge of the
+      // cover art and the right edge of the window — never overlapping the art.
+      // We compute everything in #swipeZone's own coordinate space (offsetLeft/
+      // offsetTop relative to its offsetParent) to avoid getBoundingClientRect()
+      // being distorted by any active CSS transform on #swipeZone itself.
+      var swEl2 = $artWrap.closest('#swipeZone') || document.body;
+      // Art centre in swipeZone local coords (offsetLeft/Top give the art's
+      // top-left relative to its offsetParent, which is #swipeZone).
+      // We know the art is square with side `size`, so:
+      var artOffLeft = $art.offsetLeft;  // relative to #swipeZone
+      var artOffTop  = $art.offsetTop;   // relative to #swipeZone (via artWrap)
+      // artWrap may be the offsetParent of $art; walk up to swipeZone.
+      var el = $art;
+      var localLeft = 0, localTop = 0;
+      while (el && el !== swEl2) {
+        localLeft += el.offsetLeft;
+        localTop  += el.offsetTop;
+        el = el.offsetParent;
+      }
+      var artRightInSw = localLeft + size;   // right edge of art in swipeZone coords
+      var artTopInSw2  = localTop;
+      var artBotInSw2  = localTop + size;
+      // Add a hard 12 px gap so the zone never kisses the art edge.
+      var zoneLeft = artRightInSw + 12;
+      idleZone.style.left   = zoneLeft + 'px';
+      idleZone.style.right  = '0';
+      idleZone.style.width  = '';
+      idleZone.style.top    = artTopInSw2 + 'px';
+      idleZone.style.bottom = (swEl2.offsetHeight - artBotInSw2) + 'px';
     }
     // Position the liked badge and + button in idle mode.
     var $lb = document.getElementById('likedBadge');
@@ -1293,11 +1357,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   // ---------------- Controls ----------------
-  document.getElementById('playBtn').addEventListener('click', togglePlay);
-  document.getElementById('nextBtn').addEventListener('click', function(){ next(false); });
-  document.getElementById('prevBtn').addEventListener('click', prev);
-  $shuffleBtn.addEventListener('click', toggleShuffle);
-  $repeatBtn.addEventListener('click', toggleRepeat);
+  // Chromium (Windows) bug: after a button click, :hover/:active CSS states
+  // don't repaint until the mouse moves again. Force a style recalculation
+  // immediately after each click so the button shows its correct state at once.
+  function forceRepaint(el){
+    void el.offsetHeight; // triggers synchronous layout + repaint
+  }
+
+  document.getElementById('playBtn').addEventListener('click', function(e){ togglePlay(); forceRepaint(e.currentTarget); });
+  document.getElementById('nextBtn').addEventListener('click', function(e){ next(false); forceRepaint(e.currentTarget); });
+  document.getElementById('prevBtn').addEventListener('click', function(e){ prev(); forceRepaint(e.currentTarget); });
+  $shuffleBtn.addEventListener('click', function(e){ toggleShuffle(); forceRepaint(e.currentTarget); });
+  $repeatBtn.addEventListener('click', function(e){ toggleRepeat(); forceRepaint(e.currentTarget); });
 
   // Supports both a plain tap/click (jump to that point) and dragging a
   // finger/pointer along the bar to scrub, the same way the volume rail
@@ -3184,5 +3255,70 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   renderLibrary();
   idle.activity();
   fitArtSquare();
+
+  // ---------------- Debug: visualise hit zones (Ctrl+Shift+D) ----------------
+  (function(){
+    var active = false;
+    var overlays = [];
+
+    var ZONES = [
+      // [selector or id, label, color]
+      ['#art',            'Cover art',      'rgba(99,179,237,.35)'],
+      ['#idleVolumeZone', 'Volume zone',    'rgba(252,129,74,.45)'],
+      ['#swipeZone',      'Swipe zone',     'rgba(154,205,50,.15)'],
+      ['#likedBadge',     'Liked badge',    'rgba(236,72,153,.45)'],
+      ['#addToLibraryWrap','+ button',      'rgba(250,204,21,.4)'],
+    ];
+
+    function show(){
+      hide();
+      ZONES.forEach(function(z){
+        var el = document.querySelector(z[0]);
+        if (!el || el.offsetWidth === 0) return;
+        var r = el.getBoundingClientRect();
+        var ov = document.createElement('div');
+        ov.style.cssText = [
+          'position:fixed',
+          'left:' + Math.round(r.left) + 'px',
+          'top:' + Math.round(r.top) + 'px',
+          'width:' + Math.round(r.width) + 'px',
+          'height:' + Math.round(r.height) + 'px',
+          'background:' + z[2],
+          'border:2px solid ' + z[2].replace(/[\d.]+\)$/, '1)'),
+          'z-index:99999',
+          'pointer-events:none',
+          'box-sizing:border-box',
+        ].join(';');
+        // label
+        var lbl = document.createElement('span');
+        lbl.textContent = z[1];
+        lbl.style.cssText = 'position:absolute;top:3px;left:5px;font:bold 10px/1 monospace;color:#fff;text-shadow:0 1px 3px #000;white-space:nowrap;';
+        ov.appendChild(lbl);
+        // size info
+        var sz = document.createElement('span');
+        sz.textContent = Math.round(r.width) + '×' + Math.round(r.height);
+        sz.style.cssText = 'position:absolute;bottom:3px;right:5px;font:10px/1 monospace;color:#fff;text-shadow:0 1px 3px #000;';
+        ov.appendChild(sz);
+        document.body.appendChild(ov);
+        overlays.push(ov);
+      });
+    }
+
+    function hide(){
+      overlays.forEach(function(o){ o.parentNode && o.parentNode.removeChild(o); });
+      overlays = [];
+    }
+
+    document.addEventListener('keydown', function(e){
+      if (e.ctrlKey && e.shiftKey && e.key === 'D'){
+        e.preventDefault();
+        active = !active;
+        active ? show() : hide();
+      }
+    });
+
+    // Refresh on resize/zoom while active
+    window.addEventListener('resize', function(){ if (active) show(); });
+  })();
 })();
 </script>

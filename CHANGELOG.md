@@ -2,6 +2,22 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.46 — 24 octobre 2026
+
+- **Debug zones d'activation (Ctrl+Shift+D).** En mode idle, appuyer sur Ctrl+Shift+D superpose des calques colorés semi-transparents sur chaque zone d'activation : pochette (bleu), zone volume (orange), zone swipe (vert), badge liké (rose), bouton + (jaune). Chaque calque affiche son nom et ses dimensions en pixels. Re-appuyer sur Ctrl+Shift+D retire les calques. Les calques se rafraîchissent automatiquement au redimensionnement de la fenêtre.
+
+## v1.20.45 — 24 octobre 2026
+
+- **Fix zone volume idle — ne chevauche plus la pochette.** La zone d'activation du volume en mode immersif utilisait `getBoundingClientRect()` pour calculer sa position, ce qui faussait le résultat quand `#swipeZone` portait un `transform` actif (morph, animation). Remplacé par un calcul en coordonnées locales (`offsetLeft`/`offsetTop` remontés jusqu'à `#swipeZone`) qui est invariant par rapport aux transforms CSS. Un garde-fou de 12 px est ajouté entre le bord droit de la pochette et le début de la zone, garanti quelle que soit la taille de la fenêtre ou le redimensionnement.
+
+## v1.20.44 — 24 octobre 2026
+
+- **Morph idle ↔ normal.** La transition entre le player normal et le mode immersif est maintenant un morph fluide à 600 ms : tous les éléments partagent la même easing (`cubic-bezier(.4,0,.2,1)`) et bougent ensemble. Les contrôles (transport, barre de progression, tab bar) glissent vers le bas et s'effacent à l'entrée en idle ; remontent à la sortie. La taille du titre/artiste s'interpole en douceur (plus de saut instantané de font-size). La pochette grandit en même temps. Une légère impulsion de scale+translate sur `#swipeZone` donne un sentiment de "pop" organique à chaque transition.
+
+## v1.20.43 — 24 octobre 2026
+
+- **Fix refresh boutons transport.** Bug Chromium/Windows : après un clic sur un bouton (play, pause, next, previous, shuffle, repeat), les états CSS `:hover`/`:active` ne se repeignaient pas tant que la souris ne bougeait pas, laissant le bouton dans un état visuel intermédiaire (noir, sans le rond vert ni le grisé correct). Correction : `void el.offsetHeight` après chaque clic force un recalcul synchrone du layout/repaint, ce qui applique immédiatement le bon état visuel.
+
 ## v1.20.42 — 24 octobre 2026
 
 - **Revert DPI scaling (v1.20.40).** L'ajustement automatique de taille et de zoom selon le `scaleFactor` Windows a été entièrement supprimé de `main.js`. Une analyse vidéo a confirmé qu'il provoquait une superposition de calques (double titre, pochette coupée, contrôles écrasés) lors du déplacement de la fenêtre et du passage idle↔player. L'interface retrouve son comportement stable d'avant la v1.20.40 ; l'utilisateur peut ajuster le zoom manuellement via Ctrl+scroll.
