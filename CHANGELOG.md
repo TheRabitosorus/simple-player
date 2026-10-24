@@ -2,6 +2,21 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.23 — 23 octobre 2026
+
+- **Tique « liké » recentrée (mode normal).** Elle est désormais alignée sur le même axe vertical que le bouton play/pause et le bouton +, et non plus sur le centre géométrique de la swipeZone (qui est décalée par le rail de volume à droite).
+- **Rail de volume à mi-distance (mode normal).** Le rail est centré exactement à la moitié de l'espace disponible entre le bord de la pochette et le bord droit de la fenêtre, quelle que soit la taille d'interface choisie.
+- **Zone de volume idle toujours visible.** En mode idle, la pochette se réduit automatiquement si nécessaire pour garantir un espace minimum (80px) à droite — la barre de volume est donc toujours accessible.
+
+## v1.20.22 — 23 octobre 2026
+
+- **Roulette de souris = volume.** Molette vers le haut → +5%, vers le bas → −5%. Fonctionne partout dans la fenêtre, en mode normal et idle.
+
+## v1.20.21 — 23 octobre 2026
+
+- **Bouton + en idle** : décalé de 30px vers la gauche et 30px vers le haut, agrandi de 20% (62px → 74px).
+- **Menu "ajouter à une playlist" en idle** : le menu est désormais déplacé sur `document.body` au clic pour éviter tout clipping, et centré en plein milieu de l'écran.
+
 ## v1.20.20 — 23 octobre 2026
 
 - **Croix X quitte vraiment l'app.** Avant, la croix cachait Simple Player dans le tray sans quitter — Spotify continuait donc à jouer indéfiniment. Désormais la croix déclenche un vrai quit (pause Spotify + kill Ghost Spotify + fermeture). Le tray reste disponible pour afficher/masquer la fenêtre.

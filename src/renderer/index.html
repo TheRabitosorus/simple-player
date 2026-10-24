@@ -132,7 +132,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .liked-badge svg{width:22px;height:22px;flex:0 0 auto;}
 .liked-badge.on{color:var(--accent);}
 /* In normal mode: removed from flow, positioned by fitArtSquare() */
-#likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;}
+/* Shift left by half the asymmetry (padding-right − padding-left) so the badge
+   lands on the same vertical axis as play/pause, not the full swipeZone centre */
+#likedBadge{position:absolute;left:calc(50% - (var(--rail-w) + 42px) / 2);transform:translateX(-50%);z-index:2;pointer-events:none;}
+/* In idle mode the padding is symmetric (20px each side), so 50% is correct */
+#app.idle #likedBadge{left:50%;}
 /* In idle mode the badge is positioned absolutely in the top space and shown 2× bigger */
 #app.idle #likedBadge{pointer-events:none;}
 #app.idle .liked-badge svg{width:44px;height:44px;}
@@ -300,17 +304,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* ---------- Ajouter à une bibliothèque ---------- */
 #addToLibraryWrap{position:relative;display:flex;justify-content:center;flex:0 0 auto;}
-/* Idle: + button pinned to the bottom-right corner of swipeZone */
+/* Idle: + button pinned to the bottom-right corner of swipeZone,
+   30px inset from both edges (−30px from the 18px default → 48px for right
+   gives visual 18px; we want 48px right, 48px bottom to shift −30px each) */
 #app.idle #addToLibraryWrap{
   position:absolute;
-  bottom:18px;
-  right:18px;
+  bottom:48px;
+  right:48px;
   left:auto;
   display:flex;
   justify-content:flex-end;
 }
-#app.idle .add-btn{width:62px;height:62px;border-radius:50%;}
-#app.idle .add-btn svg{width:26px;height:26px;}
+/* +20% from 62px = 74px */
+#app.idle .add-btn{width:74px;height:74px;border-radius:50%;}
+#app.idle .add-btn svg{width:31px;height:31px;}
 .add-btn{
   width:52px;height:52px;border-radius:50%;
   background:var(--bg-elev);color:var(--fg-dim);
@@ -331,7 +338,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   background:var(--bg-elev-2);border:1px solid var(--border);border-radius:18px;
   padding:10px;box-shadow:0 16px 40px -12px rgba(0,0,0,.6);z-index:40;
 }
-#app.idle #addMenu{
+#app.idle #addMenu,#addMenu.idle-menu{
   position:fixed;top:50%;left:50%;bottom:auto;
   transform:translate(-50%,-50%);
 }
@@ -361,8 +368,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
 
 /* ---------- Volume rail ---------- */
+/* right:31px keeps the rail's centre exactly halfway between the cover-art's right
+   edge and the window's right edge, regardless of --rail-w.
+   The reserved space on swipeZone is (--rail-w + 62px). Half that minus half the
+   rail's own width = (62px)/2 = 31px. */
 #volumeRail{
-  position:absolute;top:0;bottom:0;right:50px;width:var(--rail-w);
+  position:absolute;top:0;bottom:0;right:31px;width:var(--rail-w);
   padding-top:14px;padding-bottom:14px;
   padding-right:max(10px, env(safe-area-inset-right,0px));
   display:flex;flex-direction:column;align-items:center;gap:14px;
@@ -402,7 +413,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 }
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
-  right:calc(var(--rail-w)/2 + 28px + max(10px, env(safe-area-inset-right,0px)));
+  right:calc(var(--rail-w)/2 - 1px + max(0px, env(safe-area-inset-right,0px)));
   width:64px;height:64px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   color:var(--fg-faint);transition:background .12s,color .12s,right .25s ease;
@@ -871,6 +882,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // falls back to the local simulation until then.
   var useRealPlayback = false;
   var onVolumeChange = null; // wired to the Windows volume (or Spotify's) below
+
+  // Mouse wheel on the window adjusts volume (5% per notch).
+  window.addEventListener('wheel', function(e){
+    if (!onVolumeChange) return;
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? -5 : 5; // scroll down = lower, scroll up = raise
+    state.volume = Math.max(0, Math.min(100, state.volume + delta));
+    if (updateVolumeDisplay) updateVolumeDisplay();
+    onVolumeChange(state.volume);
+  }, { passive: false });
+
   // Finger travel needed to sweep the whole 0-100 range. Used by BOTH volume
   // controls (idle zone and normal-mode rail) so they behave identically.
   var VOLUME_DRAG_PX = 700;
@@ -984,7 +1006,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var rect = $artWrap.getBoundingClientRect();
     var isIdle = document.getElementById('app').classList.contains('idle');
     var cap = isIdle ? 560 : 380;
-    var size = Math.max(40, Math.min(cap, rect.width, rect.height));
+    // In idle mode, always leave at least 80px to the right of the cover for
+    // the volume strip, even if it means shrinking the art a little.
+    var maxW = isIdle ? rect.width - 80 : rect.width;
+    var size = Math.max(40, Math.min(cap, maxW, rect.height));
     $art.style.width = size + 'px';
     $art.style.height = size + 'px';
     // The idle-mode volume reveal zone is a strip against the window's right
@@ -1509,6 +1534,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     function closeMenu(){
       menu.hidden = true;
+      menu.classList.remove('idle-menu');
+      // Return menu to its original parent if it was moved to body in idle mode
+      var wrap = document.getElementById('addToLibraryWrap');
+      if (menu.parentElement !== wrap) wrap.appendChild(menu);
       backdrop.hidden = true;
       addBtn.setAttribute('aria-expanded', 'false');
     }
@@ -1604,6 +1633,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     addBtn.addEventListener('click', function(){
       if (!menu.hidden){ closeMenu(); return; }
       buildMenu();
+      // In idle mode the wrap is positioned deep in the DOM and can be
+      // clipped — move the menu to document.body so it's always on top.
+      var isIdleNow = document.getElementById('app').classList.contains('idle');
+      if (isIdleNow) {
+        if (menu.parentElement !== document.body) document.body.appendChild(menu);
+        menu.classList.add('idle-menu');
+      } else {
+        var wrap = document.getElementById('addToLibraryWrap');
+        if (menu.parentElement !== wrap) wrap.appendChild(menu);
+        menu.classList.remove('idle-menu');
+      }
       menu.hidden = false;
       backdrop.hidden = false;
       addBtn.setAttribute('aria-expanded', 'true');
