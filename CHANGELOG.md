@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.12 — 23 octobre 2026
+
+- **Quit — Ghost Spotify toujours fermé.** Quand le Ghost Spotify est activé dans les settings, Spotify est maintenant tué à chaque fermeture de Simple Player — même s'il était déjà ouvert au lancement. La musique s'arrête garantiment.
+
 ## v1.20.11 — 23 octobre 2026
 
 - **Tabbar — ordre inversé.** Library à gauche, Player au centre, Search à droite.

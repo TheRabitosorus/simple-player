@@ -388,10 +388,10 @@ async function launchGhostSpotify() {
 }
 
 function killGhostSpotifyIfAny() {
-  if (!ghostLaunched) return;
   ghostLaunched = false;
-  // Closes the Spotify we started (and its helper processes). Never runs if
-  // Spotify was already open when Simple Player started.
+  // Kill Spotify whenever Ghost is enabled — whether we launched it this
+  // session or it was already running. This ensures music stops on quit.
+  if (!store.get('ghostSpotifyEnabled')) return;
   execFile('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], () => {});
 }
 
