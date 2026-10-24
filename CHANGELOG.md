@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.15 — 23 octobre 2026
+
+- **Auto-updater complet.** Au lancement, Simple Player vérifie silencieusement si une nouvelle version existe sur GitHub. Quand elle est téléchargée, un pop-up s'affiche avec « Installer maintenant » (redémarre et installe) ou « Plus tard ». L'installeur NSIS et le désinstalleur Windows (Ajout/Suppression de programmes) sont déjà configurés via electron-builder.
+
 ## v1.20.14 — 23 octobre 2026
 
 - **Mode idle — bouton + réduit à 30%.** 94px (était 312px), icône 40px.

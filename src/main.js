@@ -398,6 +398,11 @@ function killGhostSpotifyIfAny() {
 // Explicit, manual fallback for the position/size memory above — a
 // tangible "do it now" control in Settings in case the automatic
 // save-on-move/resize ever doesn't fire for some reason.
+ipcMain.handle('update:install', () => {
+  quitSignalSent = true; // skip the pause-before-quit dance
+  autoUpdater.quitAndInstall();
+});
+
 ipcMain.handle('window:save-position-now', () => {
   saveBounds();
   return true;
@@ -605,10 +610,20 @@ app.whenReady().then(() => {
   // user's Windows account settings were reset outside the app.
   setLaunchAtStartup(store.get('launchAtStartup'));
 
-  // Check for a new version every time the app is opened (not on a timer).
+  // Auto-updater: check on launch, download silently, prompt the user when ready.
   if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {
-      // Silent failure (e.g. offline): the user can keep using the current version.
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = false;
+
+    autoUpdater.on('update-downloaded', (info) => {
+      // Tell the renderer a new version is ready — it will show the prompt.
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update:ready', info.version);
+      }
+    });
+
+    autoUpdater.checkForUpdates().catch(() => {
+      // Silent failure (offline, GitHub unreachable, etc.).
     });
   }
 

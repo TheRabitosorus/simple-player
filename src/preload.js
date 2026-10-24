@@ -41,5 +41,10 @@ contextBridge.exposeInMainWorld('simplePlayer', {
 
   // Called by main just before the app quits, so the renderer can pause
   // Spotify playback gracefully before the process exits.
-  onAppWillQuit: (callback) => ipcRenderer.on('app:will-quit', () => callback())
+  onAppWillQuit: (callback) => ipcRenderer.on('app:will-quit', () => callback()),
+
+  // Auto-updater: called when a new version has been downloaded and is ready
+  // to install. The callback receives the new version string.
+  onUpdateReady: (callback) => ipcRenderer.on('update:ready', (event, version) => callback(version)),
+  installUpdate: () => ipcRenderer.invoke('update:install')
 });

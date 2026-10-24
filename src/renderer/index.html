@@ -2803,6 +2803,33 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){});
       }
     });
+
+    // Auto-updater: show a prompt when a new version has been downloaded.
+    if (window.simplePlayer.onUpdateReady) {
+      window.simplePlayer.onUpdateReady(function(version){
+        // Create a self-contained overlay — don't reuse the settings dialog.
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:24px;';
+        var box = document.createElement('div');
+        box.style.cssText = 'max-width:380px;width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:18px;padding:28px 24px 20px;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);';
+        box.innerHTML =
+          '<p style="font-size:20px;font-weight:700;margin:0 0 10px;color:var(--fg)">Mise à jour disponible</p>' +
+          '<p style="color:var(--fg-dim);margin:0 0 24px;font-size:15px;line-height:1.5">La version <strong style="color:var(--fg)">' + version + '</strong> est prête à installer.<br>Simple Player va redémarrer automatiquement.</p>' +
+          '<div style="display:flex;gap:12px;justify-content:flex-end">' +
+            '<button id="updateLaterBtn" style="padding:10px 20px;border-radius:12px;background:var(--bg-elev-2);border:1px solid var(--border);font-size:15px;color:var(--fg);cursor:pointer">Plus tard</button>' +
+            '<button id="updateNowBtn" style="padding:10px 24px;border-radius:12px;background:var(--accent);border:none;font-size:15px;font-weight:700;color:#fff;cursor:pointer">Installer maintenant</button>' +
+          '</div>';
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        box.querySelector('#updateNowBtn').addEventListener('click', function(){
+          overlay.remove();
+          window.simplePlayer.installUpdate();
+        });
+        box.querySelector('#updateLaterBtn').addEventListener('click', function(){
+          overlay.remove();
+        });
+      });
+    }
   }
 
   // ---------------- Init ----------------
