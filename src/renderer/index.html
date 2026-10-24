@@ -90,7 +90,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #tabbar{opacity:0;max-height:0;padding-top:0;padding-bottom:0;border-color:transparent;}
 #app.idle #progressWrap{opacity:0;max-height:0;margin:0;padding:0;pointer-events:none;}
 #app.idle #transport{opacity:0;max-height:0;margin:0;pointer-events:none;}
-#app.idle #addToLibraryWrap{opacity:0;max-height:0;margin:0;pointer-events:none;}
+#app.idle #addToLibraryWrap{opacity:1;max-height:none;margin:0;pointer-events:auto;position:absolute;z-index:3;}
 /* Hidden off to the right (not just faded out) while idle, but NOT inert:
    pointer-events stays enabled so a single tap here — the space between
    the cover art and the window's edge — is caught (see JS) even though
@@ -292,17 +292,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 #addMenu{
   position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
-  min-width:220px;max-width:280px;max-height:52vh;overflow-y:auto;
-  background:var(--bg-elev-2);border:1px solid var(--border);border-radius:14px;
-  padding:6px;box-shadow:0 16px 40px -12px rgba(0,0,0,.6);z-index:40;
+  min-width:360px;max-width:480px;max-height:60vh;overflow-y:auto;
+  background:var(--bg-elev-2);border:1px solid var(--border);border-radius:18px;
+  padding:10px;box-shadow:0 16px 40px -12px rgba(0,0,0,.6);z-index:40;
 }
 .add-menu-item{
-  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
-  padding:10px 10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--fg);
+  display:flex;align-items:center;gap:16px;width:100%;text-align:left;
+  padding:14px 14px;border-radius:12px;font-size:22px;font-weight:600;color:var(--fg);
 }
 .add-menu-item:hover{background:var(--bg-elev);}
-.add-menu-item .swatch{width:26px;height:26px;border-radius:7px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
-.add-menu-item .check{margin-left:auto;width:16px;height:16px;color:var(--accent);flex:0 0 auto;}
+.add-menu-item .swatch{width:52px;height:52px;border-radius:10px;background-size:cover;background-position:center;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
+.add-menu-item .check{margin-left:auto;width:30px;height:30px;color:var(--accent);flex:0 0 auto;}
 .add-menu-divider{height:1px;background:var(--border);margin:6px 2px;}
 
 #dialogBackdrop{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px;}
@@ -961,19 +961,37 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var strip = Math.min(gapWidth, Math.max(48, Math.min(120, gapWidth * 0.45)));
       idleZone.style.left = (parentRect.width - strip) + 'px';
     }
-    // Position the liked badge centred in the space above the cover in idle mode.
+    // Position the liked badge and + button centred in the space above the cover in idle mode.
     var $lb = document.getElementById('likedBadge');
-    if ($lb) {
+    var $addWrap = document.getElementById('addToLibraryWrap');
+    if ($lb || $addWrap) {
       if (isIdle) {
         var swEl = $artWrap.parentElement; // #swipeZone
         var swRect = swEl.getBoundingClientRect();
         var awRect = $artWrap.getBoundingClientRect();
-        // artWrap centres #art; art top relative to swipeZone:
+        // Top of the cover art, relative to the swipeZone top:
         var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
-        var badgeH = 44; // 2× icon height
-        $lb.style.top = Math.round(Math.max(0, artTopInSw / 2 - badgeH / 2)) + 'px';
+        // Centre of the space = artTopInSw / 2
+        var zoneCenter = artTopInSw / 2;
+        if ($lb) {
+          var badgeH = 44;
+          $lb.style.top = Math.round(Math.max(4, zoneCenter - badgeH / 2)) + 'px';
+        }
+        if ($addWrap) {
+          var btnH = 52;
+          // Place the + button to the right of centre (mirror of the badge which is left-of-centre)
+          $addWrap.style.position = 'absolute';
+          $addWrap.style.top = Math.round(Math.max(4, zoneCenter - btnH / 2)) + 'px';
+          $addWrap.style.left = '';
+          $addWrap.style.right = '80px'; // clear of the volume strip
+        }
       } else {
-        $lb.style.top = '';
+        if ($lb) $lb.style.top = '';
+        if ($addWrap) {
+          $addWrap.style.position = '';
+          $addWrap.style.top = '';
+          $addWrap.style.right = '';
+        }
       }
     }
   }

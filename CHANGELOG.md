@@ -2,6 +2,12 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.19.8 — 23 octobre 2026
+
+- **Bouton + visible en mode idle.** Positionné à droite, centré verticalement dans l'espace entre le haut de la pochette et le haut de l'app.
+- **Menu de sélection de playlist deux fois plus grand.** Pochettes 52 px, texte 22 px, coches 30 px, menu plus large (360 px min).
+- **Tique liké : correction de position.** Centrée exactement entre le haut de la pochette et le haut de l'application.
+
 ## v1.19.7 — 23 octobre 2026
 
 - **Icônes de la barre du bas trois fois plus grandes.** Icônes 48 px (étaient 21 px), labels 18 px (étaient 10 px). Inclut l'icône Settings.
