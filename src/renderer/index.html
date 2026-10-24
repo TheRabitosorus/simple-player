@@ -60,39 +60,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .view.active{display:flex;}
 
 /* -- Player view -- */
-/* #npBackground = couche transform (animation dérive)
-   #npBgInner    = couche filter blur — séparées pour que Chromium
-                   n'annule pas l'animation quand filter est présent */
-#npBackground{position:absolute;inset:0;z-index:0;background:var(--bg);transform-origin:center center;overflow:hidden;}
-#npBgInner{position:absolute;inset:-8%;background-size:cover;background-position:center;transform-origin:center center;}
-/* Deux animations indépendantes jouées simultanément sur #npBgInner :
-   bgDriftPos  : déplace le background-position (morphe les couleurs du blur)
-   bgDriftMove : déplace + scale le layer entier (drift spatial)
-   Les durées sont non-multiples pour que les cycles ne se synchronisent jamais → effet aléatoire. */
-@keyframes bgDriftPos{
-  0%   {background-position:50% 50%;}
-  17%  {background-position:55% 44%;}
-  34%  {background-position:43% 57%;}
-  51%  {background-position:58% 52%;}
-  68%  {background-position:46% 41%;}
-  85%  {background-position:53% 61%;}
-  100% {background-position:50% 50%;}
-}
-@keyframes bgDriftMove{
-  0%   {transform:scale(1.18) translate(0%,   0%);}
-  13%  {transform:scale(1.22) translate(-2.5%, 1.5%);}
-  29%  {transform:scale(1.20) translate(1.8%, -2.2%);}
-  47%  {transform:scale(1.25) translate(-1.2%, 2.8%);}
-  61%  {transform:scale(1.19) translate(2.6%,  1%);}
-  78%  {transform:scale(1.23) translate(-0.8%,-2.5%);}
-  91%  {transform:scale(1.21) translate(1.5%,  0.8%);}
-  100% {transform:scale(1.18) translate(0%,   0%);}
-}
-#npBackground.bg-animated #npBgInner{
-  animation:
-    bgDriftMove var(--bg-anim-dur, 38s) ease-in-out infinite,
-    bgDriftPos  calc(var(--bg-anim-dur, 38s) * 0.73) ease-in-out infinite;
-}
+/* Canvas blob background — style Spotify fullscreen.
+   Un canvas plein écran avec des blobs de couleur extraits de la pochette
+   qui dérivent de façon indépendante, animés en JS via requestAnimationFrame. */
+#npBackground{position:absolute;inset:0;z-index:0;background:#0a0a0a;overflow:hidden;}
+#npBgCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #swipeZone{position:relative;
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -181,13 +153,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;padding-left:20px;padding-top:20px;}
 /* The idle-mode volume bar lives INSIDE #idleVolumeZone, centred in the strip. */
-#idleVolIcon{position:absolute;top:-38px;left:50%;transform:translateX(-50%);width:28px;height:28px;color:var(--fg-dim);}
+/* Idle volume slider — toujours visible en mode idle, style référence image */
+#idleVolIcon{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:26px;height:26px;color:rgba(255,255,255,.55);opacity:0;transition:opacity .22s ease;}
 #idleVolIcon svg{width:100%;height:100%;}
-#idleVolBar{position:absolute;width:5px;top:15%;bottom:15%;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
-#app.idle.volume-revealed #idleVolBar{opacity:1;}
-#idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:3px;background:var(--accent);}
-#idleVolThumb{position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 1px 6px rgba(0,0,0,.5);}
-#idleVolLabel{position:absolute;bottom:-36px;left:50%;transform:translateX(-50%);font-size:24px;font-weight:700;color:var(--fg-dim);white-space:nowrap;}
+#app.idle #idleVolIcon{opacity:1;}
+#idleVolBar{position:absolute;width:4px;left:50%;transform:translateX(-50%);top:54px;bottom:52px;background:rgba(255,255,255,.18);border-radius:4px;opacity:0;transition:opacity .22s ease;pointer-events:none;}
+#app.idle #idleVolBar{opacity:1;}
+#idleVolFill{position:absolute;bottom:0;left:0;right:0;border-radius:4px;background:#1db954;}
+#idleVolThumb{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;left:50%;transform:translate(-50%,50%);box-shadow:0 2px 8px rgba(0,0,0,.6);transition:box-shadow .1s ease;}
+#app.idle.vol-dragging #idleVolThumb{box-shadow:0 2px 14px rgba(29,185,84,.5);}
+#idleVolLabel{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:15px;font-weight:600;color:rgba(255,255,255,.45);white-space:nowrap;opacity:0;transition:opacity .22s ease;}
+#app.idle #idleVolLabel{opacity:1;}
 #art{transition:width var(--morph-dur) var(--morph-ease), height var(--morph-dur) var(--morph-ease), transform .25s ease, opacity .25s ease;}
 #swipeZone.anim-next{animation:swipeNext .32s ease;}
 #swipeZone.anim-prev{animation:swipePrev .32s ease;}
@@ -522,7 +498,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     <!-- Lecture -->
     <section id="view-player" class="view active">
-      <div id="npBackground"><div id="npBgInner"></div></div>
+      <div id="npBackground"><canvas id="npBgCanvas"></canvas></div>
       <span id="playlistBadge" class="playlist-badge" hidden></span>
       <div id="swipeZone">
         <div id="likedBadge" class="liked-badge" title="Not liked">
@@ -587,12 +563,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
            (pointer-events:none) outside idle mode, where the always-
            visible rail's own controls handle things as usual. -->
       <div id="idleVolumeZone">
+        <div id="idleVolIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          </svg>
+        </div>
         <div id="idleVolBar" aria-hidden="true">
-          <div id="idleVolIcon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg></div>
           <div id="idleVolFill"></div>
           <div id="idleVolThumb"></div>
-          <span id="idleVolLabel"></span>
         </div>
+        <span id="idleVolLabel"></span>
       </div>
     </section>
 
@@ -1060,58 +1042,156 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $likedBadge.title = liked ? 'Liked / in a playlist' : 'Not liked';
   }
 
+  // ---- Canvas blob background — style Spotify fullscreen ----
+  // Des blobs de couleur extraits de la pochette dérivent de façon indépendante,
+  // floutés et fondus ensemble via filter:blur sur le canvas.
   var $npBackground = document.getElementById('npBackground');
-  var $npBgInner    = document.getElementById('npBgInner');
-  var BG_SPEEDS = { normal: '40s', medium: '20s', fast: '10s' };
-  var _bgAnimApplied = null; // null forces re-apply on first call
-  function applyBgAnimation(){
-    var speed = settings.bgEnabled ? settings.bgAnimated : 'off';
-    var want = (speed !== 'off');
-    var stateKey = speed; // track speed too, not just on/off
-    if (stateKey === _bgAnimApplied) return;
-    _bgAnimApplied = stateKey;
-    if (want){
-      // Durée via custom property sur l'élément
-      $npBackground.style.setProperty('--bg-anim-dur', BG_SPEEDS[speed] || '40s');
-      // Effacer d'abord le transform inline pour que la keyframe puisse démarrer proprement.
-      // Retire + repose la classe pour forcer Chromium à rejouer l'animation depuis 0%.
-      $npBgInner.style.transform = '';
-      $npBackground.classList.remove('bg-animated');
-      void $npBackground.offsetWidth; // force reflow — garantit que Chromium redémarre l'animation
-      $npBackground.classList.add('bg-animated');
-    } else {
-      $npBackground.classList.remove('bg-animated');
-      $npBackground.style.removeProperty('--bg-anim-dur');
-      $npBgInner.style.transform = 'scale(1.2)';
+  var $npBgCanvas   = document.getElementById('npBgCanvas');
+  var _bgCtx        = $npBgCanvas.getContext('2d');
+  var _bgBlobs      = [];       // [{x,y,vx,vy,r,color,phase}]
+  var _bgRafId      = null;     // requestAnimationFrame handle
+  var _bgColors     = ['#1a1a2e','#16213e','#0f3460']; // fallback sombre
+  var _idleArtBottom = 0; // coordonnée Y du bas de la pochette dans swipeZone (maj par fitArtSquare)
+  var BG_SPEEDS     = { normal: 0.12, medium: 0.28, fast: 0.55 }; // px/frame normalisé
+
+  // Extraire N couleurs dominantes d'une image via canvas (down-sample + k-means simplifié)
+  function extractColors(imgEl, n){
+    var s = 32; // résolution d'échantillonnage
+    var c = document.createElement('canvas'); c.width = s; c.height = s;
+    var x = c.getContext('2d');
+    x.drawImage(imgEl, 0, 0, s, s);
+    var data = x.getImageData(0, 0, s, s).data;
+    // Bucketiser les couleurs en ignorant les très sombres et très claires
+    var buckets = {};
+    for (var i = 0; i < data.length; i += 4){
+      var r = data[i], g = data[i+1], b = data[i+2];
+      var brightness = (r + g + b) / 3;
+      if (brightness < 18 || brightness > 230) continue; // skip near-black / near-white
+      // Quantiser en groupes de 32
+      var key = (Math.round(r/32)*32) + ',' + (Math.round(g/32)*32) + ',' + (Math.round(b/32)*32);
+      buckets[key] = (buckets[key] || 0) + 1;
+    }
+    var sorted = Object.keys(buckets).sort(function(a,b){ return buckets[b]-buckets[a]; });
+    var colors = [];
+    for (var j = 0; j < Math.min(n, sorted.length); j++){
+      var rgb = sorted[j].split(',');
+      // Assombrir légèrement pour que le fond reste discret
+      var rf = Math.round(+rgb[0] * 0.7);
+      var gf = Math.round(+rgb[1] * 0.7);
+      var bf = Math.round(+rgb[2] * 0.7);
+      colors.push('rgb(' + rf + ',' + gf + ',' + bf + ')');
+    }
+    return colors.length >= 2 ? colors : ['#1a1234','#0d2240'];
+  }
+
+  function initBlobs(colors){
+    var W = $npBgCanvas.width, H = $npBgCanvas.height;
+    _bgBlobs = [];
+    var nBlobs = 6;
+    for (var i = 0; i < nBlobs; i++){
+      var angle = Math.random() * Math.PI * 2;
+      var speed = 0.3 + Math.random() * 0.5; // vitesse de base, sera modulée par BG_SPEEDS
+      _bgBlobs.push({
+        x: W * (0.1 + Math.random() * 0.8),
+        y: H * (0.1 + Math.random() * 0.8),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: Math.min(W, H) * (0.35 + Math.random() * 0.35), // rayon large pour fusion
+        color: colors[i % colors.length],
+        phase: Math.random() * Math.PI * 2,      // pour la sinusoïde de dérive
+        phaseSpeed: 0.003 + Math.random() * 0.004 // vitesse de la sinusoïde
+      });
     }
   }
-  function updateNpBackground(){
-    if (!settings.bgEnabled){
-      $npBackground.style.background = 'var(--bg)';
-      $npBgInner.style.backgroundImage = 'none';
-      $npBgInner.style.background = '';
-      $npBgInner.style.filter = '';
-      $npBgInner.style.transform = '';
-      _bgAnimApplied = null;
-      applyBgAnimation();
-      return;
+
+  function drawBgFrame(){
+    if (!settings.bgEnabled || settings.bgAnimated === 'off'){
+      _bgRafId = null; return;
     }
+    var W = $npBgCanvas.width, H = $npBgCanvas.height;
+    var speedMult = BG_SPEEDS[settings.bgAnimated] || 0.28;
+    // Fond sombre
+    _bgCtx.clearRect(0, 0, W, H);
+    _bgCtx.fillStyle = '#080808';
+    _bgCtx.fillRect(0, 0, W, H);
+    // Dessiner chaque blob avec radialGradient
+    for (var i = 0; i < _bgBlobs.length; i++){
+      var b = _bgBlobs[i];
+      // Dérive sinusoïdale perpendiculaire + direction principale
+      b.phase += b.phaseSpeed * speedMult * 4;
+      var perpX = -b.vy / (Math.sqrt(b.vx*b.vx + b.vy*b.vy) || 1);
+      var perpY =  b.vx / (Math.sqrt(b.vx*b.vx + b.vy*b.vy) || 1);
+      var drift = Math.sin(b.phase) * 0.6 * speedMult;
+      b.x += b.vx * speedMult + perpX * drift;
+      b.y += b.vy * speedMult + perpY * drift;
+      // Rebond doux sur les bords
+      if (b.x < -b.r * 0.3){ b.vx = Math.abs(b.vx); }
+      if (b.x > W + b.r * 0.3){ b.vx = -Math.abs(b.vx); }
+      if (b.y < -b.r * 0.3){ b.vy = Math.abs(b.vy); }
+      if (b.y > H + b.r * 0.3){ b.vy = -Math.abs(b.vy); }
+      // Radial gradient = blob flou
+      var grd = _bgCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      grd.addColorStop(0,   b.color.replace('rgb(','rgba(').replace(')',',0.45)'));
+      grd.addColorStop(0.5, b.color.replace('rgb(','rgba(').replace(')',',0.18)'));
+      grd.addColorStop(1,   b.color.replace('rgb(','rgba(').replace(')',',0)'));
+      _bgCtx.globalCompositeOperation = 'screen';
+      _bgCtx.fillStyle = grd;
+      _bgCtx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+    }
+    _bgCtx.globalCompositeOperation = 'source-over';
+    // Assombrissement global pour garder ça discret
+    _bgCtx.fillStyle = 'rgba(0,0,0,0.65)';
+    _bgCtx.fillRect(0, 0, W, H);
+    _bgRafId = requestAnimationFrame(drawBgFrame);
+  }
+
+  function startBgCanvas(colors){
+    if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
+    // Dimensionner le canvas à la taille réelle de l'élément
+    var rect = $npBackground.getBoundingClientRect();
+    $npBgCanvas.width  = rect.width  || 400;
+    $npBgCanvas.height = rect.height || 600;
+    if (colors && colors.length) _bgColors = colors;
+    initBlobs(_bgColors);
+    _bgRafId = requestAnimationFrame(drawBgFrame);
+  }
+
+  function stopBgCanvas(){
+    if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
+    _bgCtx.clearRect(0, 0, $npBgCanvas.width, $npBgCanvas.height);
+    _bgCtx.fillStyle = '#0a0a0a';
+    _bgCtx.fillRect(0, 0, $npBgCanvas.width, $npBgCanvas.height);
+  }
+
+  function applyBgAnimation(){
+    if (!settings.bgEnabled || settings.bgAnimated === 'off'){
+      stopBgCanvas(); return;
+    }
+    if (!_bgRafId) startBgCanvas(null); // redémarre sans changer les couleurs
+  }
+
+  function updateNpBackground(){
+    if (!settings.bgEnabled){ stopBgCanvas(); return; }
     var t = currentTrack(); if (!t) return;
     var seed = t.id + ':' + t.title;
     if (!hueCache[seed]) makeArt(seed);
     var h = hueCache[seed];
-    // Gradient sur l'inner (avec scale de base) ; parent transparent pour l'animation.
-    // Même architecture que le mode réel : parent = transform/animation, inner = contenu visuel.
-    $npBackground.style.background = 'none';
-    $npBgInner.style.backgroundImage = 'none';
-    $npBgInner.style.background =
-      'radial-gradient(120% 70% at 50% -15%, hsla(' + h.hue1 + ',60%,26%,.55), transparent 62%),' +
-      'linear-gradient(180deg, hsla(' + h.hue2 + ',45%,16%,.85) 0%, var(--bg) 78%)';
-    $npBgInner.style.filter = '';
-    // Force applyBgAnimation à re-appliquer même si l'état n'a pas changé,
-    // car updateNpBackground peut avoir posé un transform inline entre-temps.
-    _bgAnimApplied = null;
-    applyBgAnimation();
+    // Mode démo (sans vraie image) : on génère des couleurs HSL à partir des teintes calculées
+    var c1 = 'rgb(' + hslToRgb(h.hue1/360, 0.55, 0.22) + ')';
+    var c2 = 'rgb(' + hslToRgb(h.hue2/360, 0.45, 0.18) + ')';
+    var c3 = 'rgb(' + hslToRgb((h.hue1+120)/360 % 1, 0.40, 0.15) + ')';
+    startBgCanvas([c1, c2, c3, '#0d0d18', '#0a1220']);
+  }
+
+  function hslToRgb(h, s, l){
+    var r, g, b;
+    if (s === 0){ r = g = b = l; }
+    else {
+      function hue2rgb(p, q, t){ if(t<0)t+=1; if(t>1)t-=1; if(t<1/6)return p+(q-p)*6*t; if(t<1/2)return q; if(t<2/3)return p+(q-p)*(2/3-t)*6; return p; }
+      var q = l < 0.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+      r = hue2rgb(p,q,h+1/3); g = hue2rgb(p,q,h); b = hue2rgb(p,q,h-1/3);
+    }
+    return Math.round(r*255)+','+Math.round(g*255)+','+Math.round(b*255);
   }
 
   var $playlistBadge = document.getElementById('playlistBadge');
@@ -1206,6 +1286,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Zone layout (matches reference image):
       // Orange = right of cover, top of window → bottom of cover (no overlap with yellow).
       // Yellow = full width, below the cover → bottom of window (handled by swipe handler).
+      _idleArtBottom = artBottom; // partagé avec le swipe handler pour restreindre le exit idle
       idleZone.style.left   = artRight + 'px';
       idleZone.style.right  = '0';
       idleZone.style.width  = '';
@@ -1248,6 +1329,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
   }
   window.addEventListener('resize', fitArtSquare);
+  // Redimensionner le canvas quand la fenêtre change de taille
+  window.addEventListener('resize', function(){
+    if (!_bgRafId) return; // canvas inactif, pas besoin
+    var rect = $npBackground.getBoundingClientRect();
+    $npBgCanvas.width  = rect.width  || 400;
+    $npBgCanvas.height = rect.height || 600;
+    // Réinitialiser les positions des blobs pour le nouveau format
+    if (_bgColors.length) initBlobs(_bgColors);
+  });
 
   function play(){
     if (useRealPlayback){
@@ -1487,7 +1577,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // too fragile on real touch input, so it's been split out entirely.
   (function(){
     var zone = document.getElementById('swipeZone');
-    var startX = 0, startY = 0, dragging = false, locked = null, pid = null;
+    var startX = 0, startY = 0, startYInZone = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
     var downOnArt = false; // did this touch start on the cover?
 
@@ -1502,6 +1592,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       downOnArt = !!e.target.closest('#art');
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
+      // Position Y relative à swipeZone, pour restreindre le exit-idle à la zone jaune
+      var zoneRect = zone.getBoundingClientRect();
+      startYInZone = e.clientY - zoneRect.top;
       try { zone.setPointerCapture(pid); } catch(err){}
       noTransition();
     }
@@ -1514,8 +1607,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         }
       }
       // Swipe up (idle only): exit immersive mode.
+      // Restreint à la zone jaune = en dessous de la pochette (_idleArtBottom).
       if (locked === 'y'){
-        if (dy < -55 && document.getElementById('app').classList.contains('idle')){
+        if (dy < -55 && document.getElementById('app').classList.contains('idle') && startYInZone > _idleArtBottom){
           dragging = false; locked = null;
           snapBack();
           idle.exitIdle();
@@ -1619,12 +1713,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }, 2500);
     }
 
-    // Expose for the wheel handler (defined earlier in outer scope).
+    // Expose pour le wheel handler et l'entrée idle.
     showIdleVolumeBar = function(){
       if (!isIdle()) return;
-      app.classList.add('volume-revealed');
       updateIdleBar();
     };
+    // Appelé aussi à chaque mise à jour de volume (state change)
+    window._updateIdleVolumeBar = updateIdleBar;
     scheduleIdleVolumeHide = function(){
       if (!isIdle()) return;
       scheduleHide();
@@ -1635,14 +1730,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Let taps on the liked badge pass through even though the volume zone
       // now covers the full height of the swipeZone.
       if (e.target.closest('#likedBadge')) return;
-      // Reveal the bar if not already shown, then start drag immediately —
-      // even on the first touch so tap-and-drag works in one gesture.
-      if (!app.classList.contains('volume-revealed')){
-        app.classList.add('volume-revealed');
-        updateIdleBar();
-      }
+      // Mettre à jour le bar au début du drag
+      updateIdleBar();
       dragging = true; pid = e.pointerId;
       startY = e.clientY; startVolume = state.volume;
+      app.classList.add('vol-dragging');
       try { zone.setPointerCapture(pid); } catch(err){}
       scheduleHide();
       e.preventDefault();
@@ -1662,6 +1754,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function endDrag(){
       if (!dragging) return;
       dragging = false;
+      app.classList.remove('vol-dragging');
       scheduleHide();
     }
     zone.addEventListener('pointerup', endDrag);
@@ -1712,7 +1805,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       render();
       notifyVolumeChange();
     });
-    updateVolumeDisplay = render; // shared with the swipe-up/down-on-art volume gesture
+    updateVolumeDisplay = function(){ render(); if (window._updateIdleVolumeBar) window._updateIdleVolumeBar(); };
     render();
   })();
 
@@ -1956,6 +2049,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           app.classList.add('idle');
           fitArtSquare(); // immediate pass for size
           setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
+          if (window._updateIdleVolumeBar) window._updateIdleVolumeBar();
         }
       }, settings.idleDelay);
     }
@@ -2030,8 +2124,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   wirePillGroup('bgAnimGroup', settings.bgAnimated || 'off', function(v){
     settings.bgAnimated = v; // 'off' | 'normal' | 'medium' | 'fast'
     saveSettings();
-    _bgAnimApplied = null; // force re-apply even if same on/off state
-    applyBgAnimation();
+    // Redémarre ou stoppe le canvas selon le nouvel état
+    if (useRealPlayback && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
+    else applyBgAnimation();
   });
 
   wirePillGroup('startupGroup', settings.startup ? 'on' : 'off', function(v){
@@ -2840,25 +2935,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var _lastArtUrl = '';
   function updateNpBackgroundReal(artUrl){
     if (artUrl) _lastArtUrl = artUrl;
-    if (!settings.bgEnabled || !artUrl){
-      $npBackground.style.background = 'var(--bg)';
-      $npBgInner.style.backgroundImage = 'none';
-      $npBgInner.style.filter = '';
-      _bgAnimApplied = null;
-      applyBgAnimation();
-      return;
-    }
-    // $npBgInner porte l'image et le filtre blur
-    // $npBackground porte l'animation transform (sans filter — sinon Chromium bloque l'animation)
-    $npBackground.style.background = 'none';
-    $npBgInner.style.backgroundImage = cssUrl(artUrl);
-    $npBgInner.style.backgroundSize = 'cover';
-    $npBgInner.style.backgroundPosition = 'center';
-    $npBgInner.style.filter = 'blur(60px) brightness(.45)';
-    // Force applyBgAnimation à re-appliquer même si l'état n'a pas changé,
-    // car setBackgroundFromUrl peut avoir posé un transform inline entre-temps.
-    _bgAnimApplied = null;
-    applyBgAnimation();
+    if (!settings.bgEnabled || !artUrl){ stopBgCanvas(); return; }
+    if (settings.bgAnimated === 'off'){ stopBgCanvas(); return; }
+    // Charger l'image, extraire les couleurs dominantes, démarrer les blobs
+    var img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = function(){
+      var colors = extractColors(img, 6);
+      startBgCanvas(colors);
+    };
+    img.onerror = function(){
+      // Fallback si l'image ne peut pas être lue (CORS, etc.)
+      startBgCanvas(['#1a1234','#0d2240','#1a2040']);
+    };
+    img.src = artUrl;
   }
 
   var lastKnownTrackId = null;

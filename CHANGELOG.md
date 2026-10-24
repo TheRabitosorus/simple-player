@@ -2,6 +2,16 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.61 — 24 octobre 2026
+
+- **Zones idle — exactement comme l'image de référence.** La zone jaune (swipe-up pour quitter le mode idle) est maintenant restreinte au-dessous de la pochette : la position de départ du geste (`startYInZone`) doit être plus basse que `_idleArtBottom` (calculé par `fitArtSquare`). Avant, le swipe-up fonctionnait depuis n'importe où dans `#swipeZone`.
+- **Background canvas moins lumineux.** Les blobs canvas étaient trop vifs (teintes jaune/brun). Alpha réduit (0.75→0.45, 0.35→0.18) et assombrissement global renforcé (0.45→0.65). Résultat : fond très discret, ambiance sombre.
+- **Slider volume idle redesigné.** Le slider vertical en mode idle adopte le style de l'image de référence : toujours visible dès l'entrée en idle (plus de tap pour révéler), icône volume en haut, track gris foncé (4 px), portion remplie en vert (#1db954), thumb blanc (18 px) avec glow vert pendant le drag, pourcentage en bas. Le fill se met à jour en temps réel lors des changements de volume depuis n'importe quelle source.
+
+## v1.20.60 — 24 octobre 2026
+
+- **Background : blobs canvas style Spotify.** Remplacé l'animation CSS par un canvas animé en JS — 6 blobs de couleur extraits de la pochette (via down-sample + quantisation) dérivent de façon indépendante avec une trajectoire sinusoïdale, fondus par `radialGradient` en mode `screen`. En mode réel, les couleurs sont extraites de la vraie pochette Spotify. Résultat : fond vivant, organique, jamais répétitif.
+
 ## v1.20.59 — 24 octobre 2026
 
 - **Background : animation organique.** Remplacement du drift linéaire par deux animations CSS indépendantes jouées simultanément — `bgDriftMove` (déplacement spatial + scale) et `bgDriftPos` (variation de `background-position` qui morphe les couleurs du blur). Les durées sont des multiples non-entiers l'une de l'autre, donc les cycles ne se synchronisent jamais et le mouvement paraît aléatoire.
