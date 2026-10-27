@@ -1174,10 +1174,20 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       } else {
         r0 = 30; g0 = 60; b0 = 120;
       }
-      grd.addColorStop(0,    'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + s.alpha + ')');
-      grd.addColorStop(0.35, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.65) + ')');
-      grd.addColorStop(0.70, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.20) + ')');
-      grd.addColorStop(1,    'rgba(' + r0 + ',' + g0 + ',' + b0 + ',0)');
+      // Profil gaussien — alpha 0 au centre, pic doux vers 20-30%, retombe doucement à 0
+      // Évite le "point" visible au centre et les lignes de banding
+      var a = s.alpha;
+      var c = 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',';
+      grd.addColorStop(0.00, c + '0)');
+      grd.addColorStop(0.08, c + (a*0.25).toFixed(3) + ')');
+      grd.addColorStop(0.18, c + (a*0.72).toFixed(3) + ')');
+      grd.addColorStop(0.28, c + (a*0.95).toFixed(3) + ')');
+      grd.addColorStop(0.38, c + (a*0.80).toFixed(3) + ')');
+      grd.addColorStop(0.50, c + (a*0.55).toFixed(3) + ')');
+      grd.addColorStop(0.65, c + (a*0.28).toFixed(3) + ')');
+      grd.addColorStop(0.80, c + (a*0.10).toFixed(3) + ')');
+      grd.addColorStop(0.92, c + (a*0.03).toFixed(3) + ')');
+      grd.addColorStop(1.00, c + '0)');
       _bgCtx.globalCompositeOperation = 'screen';
       _bgCtx.fillStyle = grd;
       _bgCtx.fillRect(0, 0, W, H);
@@ -1191,14 +1201,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function startBgCanvas(colors){
     if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    // Dimensionner le canvas en pixels physiques (×dpr) pour éviter le flou/banding
+    // Résolution physique — minimum 2× pour que les dégradés soient parfaitement lisses
     var rect = $npBackground.getBoundingClientRect();
-    var dpr  = window.devicePixelRatio || 1;
+    var dpr  = Math.max(window.devicePixelRatio || 1, 2);
     var cssW = rect.width  || 400;
     var cssH = rect.height || 600;
     $npBgCanvas.width  = Math.round(cssW * dpr);
     $npBgCanvas.height = Math.round(cssH * dpr);
-    // Le canvas CSS reste à la taille de l'élément
     $npBgCanvas.style.width  = cssW + 'px';
     $npBgCanvas.style.height = cssH + 'px';
     // Scaler le contexte pour que les coordonnées restent en CSS px dans drawBgFrame

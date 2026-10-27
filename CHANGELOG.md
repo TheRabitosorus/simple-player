@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.72 — 27 octobre 2026
+
+- **Animation background — dégradés parfaitement lisses.** Double fix : (1) résolution forcée à minimum 2× devicePixelRatio pour éliminer le banding même sur écrans 1×; (2) profil gaussien sur les color stops (10 stops, alpha 0 au centre → pic doux à 28% → retour à 0) — supprime le "point" visible au centre de chaque spotlight et toute ligne de transition.
+
 ## v1.20.71 — 27 octobre 2026
 
 - **Animation background — résolution physique (HiDPI).** Canvas dimensionné en pixels physiques (×`devicePixelRatio`) au lieu de CSS px. Sur un écran 2× le canvas avait la moitié de la résolution utile, ce qui créait des bandes visibles dans les dégradés. Le contexte est scalé via `setTransform(dpr,…)` pour que toutes les coordonnées restent en CSS px dans le code de dessin.
