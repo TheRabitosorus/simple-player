@@ -1050,14 +1050,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Spotlights orbitaux : chacun décrit une ellipse autour du centre de la scène.
   // Paramètres fixes — les couleurs seront mises à jour par updateBgSpotlights().
   var _bgSpots = [
-    // spotlight principal — grande orbite lente, très lumineux
-    { cx:0.5, cy:0.4, rx:0.40, ry:0.30, phase:0,           speed:1.0,  r:1.6,  alpha:1.0,  color:'#1a3a6e' },
-    // spotlight secondaire — couleur complémentaire, orbite inversée
-    { cx:0.5, cy:0.6, rx:0.36, ry:0.24, phase:Math.PI,     speed:0.73, r:1.4,  alpha:0.90, color:'#0d2240' },
-    // highlight clair — tache quasi-blanche qui renforce la luminosité au centre
-    { cx:0.5, cy:0.45, rx:0.28, ry:0.20, phase:Math.PI*0.7, speed:1.2, r:0.8,  alpha:0.70, color:'#ffffff' },
-    // accent couleur 3 — coin opposé
-    { cx:0.3, cy:0.6, rx:0.25, ry:0.18, phase:Math.PI*1.5, speed:0.9,  r:1.0,  alpha:0.80, color:'#0d1a3a' },
+    // spotlight principal — grand, lent, couvre la moitié supérieure
+    { cx:0.5, cy:0.35, rx:0.45, ry:0.30, phase:0,            speed:1.0,  r:1.1,  alpha:1.0,  color:'#1a3a6e' },
+    // spotlight secondaire — couleur 2, orbite inverse
+    { cx:0.5, cy:0.65, rx:0.40, ry:0.25, phase:Math.PI,      speed:0.73, r:1.0,  alpha:0.95, color:'#0d2240' },
+    // highlight blanc — tache lumineuse claire qui voyage
+    { cx:0.5, cy:0.45, rx:0.30, ry:0.22, phase:Math.PI*0.7,  speed:1.15, r:0.6,  alpha:0.85, color:'#e8eeff' },
+    // couleur 3 — bord gauche
+    { cx:0.25, cy:0.55, rx:0.22, ry:0.18, phase:Math.PI*1.5, speed:0.9,  r:0.85, alpha:0.90, color:'#0d1a3a' },
   ];
 
   // Extraire N couleurs dominantes d'une image via canvas (down-sample + k-means simplifié)
@@ -1097,13 +1097,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     _bgSpots[1].color = colors[1] || '#0d2240';
     _bgSpots[2].color = '#e8eeff'; // toujours un highlight clair pour la luminosité
     _bgSpots[3].color = colors[2] || colors[1] || '#0d1a3a';
-    // Fond de base = couleur principale à 60% de luminosité — bien visible, pas noir
+    // Fond de base = couleur principale très sombre — les spotlights ressortent dessus
     var c0 = _bgSpots[0].color;
     var m = c0.match(/\d+/g);
     if (m){
-      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.75) + ',' + Math.round(+m[1]*0.75) + ',' + Math.round(+m[2]*0.75) + ')';
+      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.18) + ',' + Math.round(+m[1]*0.18) + ',' + Math.round(+m[2]*0.18) + ')';
     } else {
-      _bgSpots[0]._base = '#0d1a2e';
+      _bgSpots[0]._base = '#080810';
     }
   }
 
@@ -1131,16 +1131,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var gr   = diag * s.r * 0.5;
 
       var grd = _bgCtx.createRadialGradient(sx, sy, 0, sx, sy, gr);
-      // Couleur au centre avec alpha fort, fondu vers transparent
       var cm  = s.color.match(/\d+/g);
-      if (cm){
-        grd.addColorStop(0,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + s.alpha + ')');
-        grd.addColorStop(0.40,'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + (s.alpha*0.50) + ')');
-        grd.addColorStop(1,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',0)');
-      } else {
-        grd.addColorStop(0,   'rgba(30,60,120,' + s.alpha + ')');
-        grd.addColorStop(1,   'rgba(30,60,120,0)');
-      }
+      var r0 = cm ? +cm[0] : 30;
+      var g0 = cm ? +cm[1] : 60;
+      var b0 = cm ? +cm[2] : 120;
+      grd.addColorStop(0,    'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + s.alpha + ')');
+      grd.addColorStop(0.35, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.65) + ')');
+      grd.addColorStop(0.70, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.20) + ')');
+      grd.addColorStop(1,    'rgba(' + r0 + ',' + g0 + ',' + b0 + ',0)');
       _bgCtx.globalCompositeOperation = 'screen';
       _bgCtx.fillStyle = grd;
       _bgCtx.fillRect(0, 0, W, H);

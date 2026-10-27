@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.67 — 27 octobre 2026
+
+- **Animation background — mouvement visible.** Fond de base ramené à 18% de la couleur (très sombre) pour que les spotlights ressortent clairement. Gradient des spotlights étendu sur 70% du rayon. Résultat : fond sombre avec taches lumineuses colorées bien visibles qui orbitent.
+
 ## v1.20.66 — 27 octobre 2026
 
 - **Animation background — contraste maximal style Spotify fullscreen.** Couleurs extraites sans assombrissement (×1.0), fond de base à 75% de luminosité (plus gris-noir), 4 spotlights dont un highlight quasi-blanc pour la tache lumineuse centrale, voile noir réduit à 18%. L'animation est maintenant aussi vivide que le player Spotify en plein écran.
