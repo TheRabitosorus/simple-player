@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.69 — 27 octobre 2026
+
+- **Animation background — bug critique : couleurs hex mal parsées.** `.match(/\d+/g)` sur `'#1a3a6e'` ne donne pas les composantes RGB (ça extrait juste `['1', '3', '6']`), donc tous les gradients étaient quasi-noirs. Fix : parsing hex correct via `parseInt(hexM[n], 16)` avec fallback rgb(). C'était la vraie cause du blocage visuel — l'animation tournait bien mais ne dessinait rien de visible.
+
 ## v1.20.68 — 27 octobre 2026
 
 - **Animation background — RAF ne se coupe plus au démarrage.** Le bug : `setPlayIcon(false)` (appelé à l'init) annulait le RAF juste après `startBgCanvas`. Fix : découplage complet — `syncBgToPlayState(bool)` est appelé uniquement par `play()`, `pause()`, `playSavedTrack()` et le poll Spotify lors d'un vrai changement d'état. `setPlayIcon` ne touche plus au canvas.

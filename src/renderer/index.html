@@ -1131,10 +1131,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var gr   = diag * s.r * 0.5;
 
       var grd = _bgCtx.createRadialGradient(sx, sy, 0, sx, sy, gr);
-      var cm  = s.color.match(/\d+/g);
-      var r0 = cm ? +cm[0] : 30;
-      var g0 = cm ? +cm[1] : 60;
-      var b0 = cm ? +cm[2] : 120;
+      // Convertir la couleur (hex ou rgb(...)) en composantes r,g,b
+      var r0, g0, b0;
+      var hexM = s.color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+      var rgbM = s.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (hexM){
+        r0 = parseInt(hexM[1],16); g0 = parseInt(hexM[2],16); b0 = parseInt(hexM[3],16);
+      } else if (rgbM){
+        r0 = +rgbM[1]; g0 = +rgbM[2]; b0 = +rgbM[3];
+      } else {
+        r0 = 30; g0 = 60; b0 = 120;
+      }
       grd.addColorStop(0,    'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + s.alpha + ')');
       grd.addColorStop(0.35, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.65) + ')');
       grd.addColorStop(0.70, 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',' + (s.alpha*0.20) + ')');
