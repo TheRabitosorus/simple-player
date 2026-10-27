@@ -536,6 +536,15 @@ ipcMain.handle('volume:set', (event, percent) => {
 ipcMain.handle('display:get-zoom-factor', () => store.get('zoomFactor'));
 ipcMain.handle('display:set-zoom-factor', (event, factor) => setZoomFactor(factor));
 
+ipcMain.handle('window:set-fullscreen', (event, value) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setFullScreen(!!value);
+  }
+});
+ipcMain.handle('window:is-fullscreen', () => {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow.isFullScreen() : false;
+});
+
 ipcMain.handle('settings:get-launch-at-startup', () => store.get('launchAtStartup'));
 ipcMain.handle('settings:set-launch-at-startup', (event, enabled) => {
   setLaunchAtStartup(!!enabled);
@@ -592,7 +601,35 @@ ipcMain.handle('ghost:no-active-device', () => {
   if (store.get('ghostSpotifyEnabled')) launchGhostSpotify();
 });
 
+// Disable Windows Communications Ducking (the feature that lowers all other
+// app volumes when a phone call / Teams / Discord is active). Writes one
+// registry value to HKCU — non-destructive, per-user, reversible. Without
+// this, the Windows audio engine can randomly drop the master volume to 20%
+// and restore it a few seconds later, making the volume bar appear to jump
+// on its own every time any communication app opens an audio session.
+// Registry key: HKCU\SOFTWARE\Microsoft\Multimedia\Audio
+//   UserDuckingPreference = 3  (0=duck-all  1=80%  2=mute-all  3=do-nothing)
+function disableWindowsCommunicationsDucking() {
+  if (process.platform !== 'win32') return;
+  try {
+    execFile('reg', [
+      'add',
+      'HKCU\\SOFTWARE\\Microsoft\\Multimedia\\Audio',
+      '/v', 'UserDuckingPreference',
+      '/t', 'REG_DWORD',
+      '/d', '3',
+      '/f'
+    ], { windowsHide: true }, () => {});
+  } catch (err) {
+    // Non-critical — ignore if reg.exe is unavailable
+  }
+}
+
 app.whenReady().then(() => {
+  // Disable Windows audio ducking so volume never drops unexpectedly when
+  // communication apps (Teams, Discord, etc.) open an audio session.
+  disableWindowsCommunicationsDucking();
+
   // One-time migration: Ghost Spotify became ON by default in v1.14.3. A
   // `false` already written to the settings file by an older version is just
   // the old default (the toggle never worked before), so switch it on once.

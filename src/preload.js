@@ -46,5 +46,8 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   // Auto-updater: called when a new version has been downloaded and is ready
   // to install. The callback receives the new version string.
   onUpdateReady: (callback) => ipcRenderer.on('update:ready', (event, version) => callback(version)),
-  installUpdate: () => ipcRenderer.invoke('update:install')
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+
+  setFullScreen: (value) => ipcRenderer.invoke('window:set-fullscreen', value),
+  isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen')
 });

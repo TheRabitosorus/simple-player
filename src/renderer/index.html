@@ -2121,6 +2121,31 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var app = document.getElementById('app');
     var timer = null;
     function isPlayerActive(){ return document.getElementById('view-player').classList.contains('active'); }
+    // Fullscreen idle : passe en plein écran à l'entrée, sort au hover haut ou double-tap
+    var _idleFullscreen = false;
+    var _idleHoverZone = 60; // px depuis le haut pour déclencher la sortie
+
+    function enterIdleFullscreen(){
+      if (window.simplePlayer && window.simplePlayer.setFullScreen){
+        _idleFullscreen = true;
+        window.simplePlayer.setFullScreen(true);
+      }
+    }
+    function exitIdleFullscreen(){
+      if (_idleFullscreen && window.simplePlayer && window.simplePlayer.setFullScreen){
+        _idleFullscreen = false;
+        window.simplePlayer.setFullScreen(false);
+      }
+    }
+
+    // Hover en haut de fenêtre → sortir du mode idle fullscreen
+    document.addEventListener('mousemove', function(e){
+      if (_idleFullscreen && e.clientY <= _idleHoverZone){
+        exitIdleFullscreen();
+        exitIdle();
+      }
+    }, { passive: true });
+
     function triggerIdleAnim(cls){
       app.classList.remove('idle-enter','idle-leave');
       // Force reflow so removing+adding the class triggers the animation fresh
@@ -2130,6 +2155,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
     var MORPH_MS = 620; // slightly over --morph-dur (600ms) so layout is settled
     function clear(){
+      exitIdleFullscreen();
       triggerIdleAnim('idle-leave');
       app.classList.remove('idle');
       if (timer){ clearTimeout(timer); timer = null; }
@@ -2142,6 +2168,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         if (isPlayerActive()){
           triggerIdleAnim('idle-enter');
           app.classList.add('idle');
+          enterIdleFullscreen();
           fitArtSquare(); // immediate pass for size
           setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
         }
@@ -2158,8 +2185,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       schedule();
     }
     function exitIdle(){
-      // Explicit dismissal (double-tap). Unlike clear(), this re-arms the
-      // timer so immersive mode can re-engage after another idle period.
+      // Explicit dismissal (double-tap or hover haut). Unlike clear(), this
+      // re-arms the timer so immersive mode can re-engage after another idle period.
+      exitIdleFullscreen();
       triggerIdleAnim('idle-leave');
       app.classList.remove('idle');
       fitArtSquare();
@@ -3408,11 +3436,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   // Keep the bar in sync with the real Windows volume (changed by keyboard,
   // the taskbar, etc.), but never while the user is touching it.
+  // Ignore small transient dips (≤ 4 pts) that Windows Communications Ducking
+  // can cause briefly when a comm app opens an audio session — they would make
+  // the bar jump for a second and snap back, looking like a bug.
+  var _lastSyncedVolume = -1;
   function syncWindowsVolume(){
     if (!windowsVolume || document.hidden || Date.now() - volumeTouchedAt < 2500) return;
     window.simplePlayer.volumeGet().then(function(v){
       if (v === null || Date.now() - volumeTouchedAt < 2500) return;
-      if (Math.round(state.volume) !== v) { state.volume = v; if (updateVolumeDisplay) updateVolumeDisplay(); }
+      var cur = Math.round(state.volume);
+      if (cur === v) { _lastSyncedVolume = v; return; }
+      // Require two consecutive readings that agree before accepting a change.
+      // This filters one-poll transient dips (ducking, brief system noise).
+      if (v === _lastSyncedVolume) {
+        state.volume = v;
+        if (updateVolumeDisplay) updateVolumeDisplay();
+      }
+      _lastSyncedVolume = v;
     });
   }
   if (window.simplePlayer && window.simplePlayer.volumeIsSupported) {

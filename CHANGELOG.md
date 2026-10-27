@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.75 — 27 octobre 2026
+
+- **Volume : plus de baisse aléatoire.** Double fix : (1) au démarrage, l'app désactive le "Communications Ducking" Windows (la feature qui baisse tous les sons quand Teams/Discord/etc. ouvre une session audio) via une clé registre `HKCU` — non-destructif, par utilisateur, réversible. (2) la synchronisation du volume toutes les 3s requiert désormais deux lectures consécutives identiques avant de mettre à jour la barre — les dips transitoires d'une seule poll (ducking résiduel, bruit système) sont filtrés et n'affichent plus de saut visuel.
+
+## v1.20.74 — 27 octobre 2026
+
+- **Mode idle plein écran.** En mode idle, la fenêtre passe automatiquement en fullscreen — la titlebar Windows disparaît et le fond animé prend tout l'espace sans bordure. Pour sortir : déplacer la souris dans les 60px du haut de l'écran (la titlebar réapparaît) ou double-tap sur la pochette. F11 reste fonctionnel indépendamment.
+
 ## v1.20.73 — 27 octobre 2026
 
 - **Animation background — centre invisible, dégradé vraiment smooth.** Profil corrigé : décroissance exponentielle depuis le centre (alpha plein → 0), pas de pic intermédiaire qui créait l'anneau visible. Rayons des spotlights augmentés (r:1.2–1.6×) pour qu'ils soient vraiment diffus sur toute la scène.
