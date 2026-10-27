@@ -2,6 +2,18 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.66 — 27 octobre 2026
+
+- **Animation background — contraste maximal style Spotify fullscreen.** Couleurs extraites sans assombrissement (×1.0), fond de base à 75% de luminosité (plus gris-noir), 4 spotlights dont un highlight quasi-blanc pour la tache lumineuse centrale, voile noir réduit à 18%. L'animation est maintenant aussi vivide que le player Spotify en plein écran.
+
+## v1.20.65 — 27 octobre 2026
+
+- **Animation background plus contrastée.** Alpha des spotlights augmenté (0.55→0.90, 0.42→0.75, 0.30→0.60), couleurs extraites moins assombries (×0.65→×0.85), fond de base plus clair (×0.35→×0.55), voile noir final réduit (0.55→0.30). L'animation est maintenant clairement visible.
+
+## v1.20.64 — 27 octobre 2026
+
+- **Animation background liée à la lecture.** L'animation canvas se stoppe quand le player est en pause et reprend automatiquement à la reprise de la lecture. Le changement passe par `setPlayIcon()` — appelé aussi bien par les contrôles manuels que par les polls Spotify.
+
 ## v1.20.63 — 26 octobre 2026
 
 - **Animation background refaite — style vidéo de référence.** Remplacé les blobs flottants par un système de **spotlights orbitaux** : 3 gradients radiaux très larges et très doux dont les centres décrivent des ellipses lentes, en mode `screen`. Résultat : une tache lumineuse douce qui voyage lentement sur un fond teinté — exactement comme l'animation Spotify de la vidéo. Pas de blobs visibles, transitions fluides et imperceptibles. Les vitesses `normal/medium/fast` restent disponibles.

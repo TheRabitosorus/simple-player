@@ -1050,12 +1050,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Spotlights orbitaux : chacun décrit une ellipse autour du centre de la scène.
   // Paramètres fixes — les couleurs seront mises à jour par updateBgSpotlights().
   var _bgSpots = [
-    // spotlight principal — grande orbite lente en haut
-    { cx:0.5, cy:0.38, rx:0.42, ry:0.28, phase:0,           speed:1.0,  r:1.5,  alpha:0.55, color:'#1a3a6e' },
-    // spotlight secondaire — orbite inversée, basse
-    { cx:0.5, cy:0.62, rx:0.38, ry:0.22, phase:Math.PI,     speed:0.73, r:1.3,  alpha:0.42, color:'#0d2240' },
-    // accent léger — petite orbite rapide, coin haut-droit
-    { cx:0.72, cy:0.3, rx:0.22, ry:0.18, phase:Math.PI*0.5, speed:1.35, r:0.9,  alpha:0.30, color:'#0a0a0a' },
+    // spotlight principal — grande orbite lente, très lumineux
+    { cx:0.5, cy:0.4, rx:0.40, ry:0.30, phase:0,           speed:1.0,  r:1.6,  alpha:1.0,  color:'#1a3a6e' },
+    // spotlight secondaire — couleur complémentaire, orbite inversée
+    { cx:0.5, cy:0.6, rx:0.36, ry:0.24, phase:Math.PI,     speed:0.73, r:1.4,  alpha:0.90, color:'#0d2240' },
+    // highlight clair — tache quasi-blanche qui renforce la luminosité au centre
+    { cx:0.5, cy:0.45, rx:0.28, ry:0.20, phase:Math.PI*0.7, speed:1.2, r:0.8,  alpha:0.70, color:'#ffffff' },
+    // accent couleur 3 — coin opposé
+    { cx:0.3, cy:0.6, rx:0.25, ry:0.18, phase:Math.PI*1.5, speed:0.9,  r:1.0,  alpha:0.80, color:'#0d1a3a' },
   ];
 
   // Extraire N couleurs dominantes d'une image via canvas (down-sample + k-means simplifié)
@@ -1080,9 +1082,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     for (var j = 0; j < Math.min(n, sorted.length); j++){
       var rgb = sorted[j].split(',');
       // Assombrir pour que le fond reste discret — les teintes claires doivent rester subtiles
-      var rf = Math.round(+rgb[0] * 0.65);
-      var gf = Math.round(+rgb[1] * 0.65);
-      var bf = Math.round(+rgb[2] * 0.65);
+      // Pas d'assombrissement — on garde les teintes vives comme Spotify fullscreen
+      var rf = +rgb[0];
+      var gf = +rgb[1];
+      var bf = +rgb[2];
       colors.push('rgb(' + rf + ',' + gf + ',' + bf + ')');
     }
     return colors.length >= 2 ? colors : ['#1a1234','#0d2240'];
@@ -1092,14 +1095,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function updateBgSpotlights(colors){
     _bgSpots[0].color = colors[0] || '#1a3a6e';
     _bgSpots[1].color = colors[1] || '#0d2240';
-    _bgSpots[2].color = colors[2] || colors[0] || '#0d1a3a';
-    // La couleur de fond de base = version très sombre de la couleur principale
+    _bgSpots[2].color = '#e8eeff'; // toujours un highlight clair pour la luminosité
+    _bgSpots[3].color = colors[2] || colors[1] || '#0d1a3a';
+    // Fond de base = couleur principale à 60% de luminosité — bien visible, pas noir
     var c0 = _bgSpots[0].color;
     var m = c0.match(/\d+/g);
     if (m){
-      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.35) + ',' + Math.round(+m[1]*0.35) + ',' + Math.round(+m[2]*0.35) + ')';
+      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.75) + ',' + Math.round(+m[1]*0.75) + ',' + Math.round(+m[2]*0.75) + ')';
     } else {
-      _bgSpots[0]._base = '#060810';
+      _bgSpots[0]._base = '#0d1a2e';
     }
   }
 
@@ -1131,7 +1135,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var cm  = s.color.match(/\d+/g);
       if (cm){
         grd.addColorStop(0,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + s.alpha + ')');
-        grd.addColorStop(0.45,'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + (s.alpha*0.35) + ')');
+        grd.addColorStop(0.40,'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + (s.alpha*0.50) + ')');
         grd.addColorStop(1,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',0)');
       } else {
         grd.addColorStop(0,   'rgba(30,60,120,' + s.alpha + ')');
@@ -1142,8 +1146,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       _bgCtx.fillRect(0, 0, W, H);
     }
     _bgCtx.globalCompositeOperation = 'source-over';
-    // Voile sombre final pour garder la lisibilité du texte
-    _bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
+    // Voile sombre léger — juste assez pour garder le texte lisible
+    _bgCtx.fillStyle = 'rgba(0,0,0,0.18)';
     _bgCtx.fillRect(0, 0, W, H);
     _bgRafId = requestAnimationFrame(drawBgFrame);
   }
@@ -1220,6 +1224,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // all times (not just on touch/press) — the main visible cue in idle
     // mode, where the transport controls are hidden.
     $art.classList.toggle('paused', !playing);
+    // Animation du background : stoppe en pause, reprend à la lecture
+    if (settings.bgEnabled && settings.bgAnimated !== 'off'){
+      if (playing){
+        if (!_bgRafId) _bgRafId = requestAnimationFrame(drawBgFrame);
+      } else {
+        if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
+      }
+    }
   }
 
   // Keeps #art a true square at all times, in both normal and idle mode,
