@@ -1222,13 +1222,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // all times (not just on touch/press) — the main visible cue in idle
     // mode, where the transport controls are hidden.
     $art.classList.toggle('paused', !playing);
-    // Animation du background : stoppe en pause, reprend à la lecture
-    if (settings.bgEnabled && settings.bgAnimated !== 'off'){
-      if (playing){
-        if (!_bgRafId) _bgRafId = requestAnimationFrame(drawBgFrame);
-      } else {
-        if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-      }
+  }
+
+  // Synchronise l'animation background avec l'état de lecture.
+  // Appelé explicitement par play() et pause() — pas par setPlayIcon
+  // (qui est aussi appelé lors d'initialisations sans changement d'état réel).
+  function syncBgToPlayState(playing){
+    if (!settings.bgEnabled || settings.bgAnimated === 'off') return;
+    if (playing){
+      if (!_bgRafId) _bgRafId = requestAnimationFrame(drawBgFrame);
+    } else {
+      if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
     }
   }
 
@@ -1370,9 +1374,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       state.playing = true;
       lastPlayChangeAt = Date.now();
       setPlayIcon(true);
+      syncBgToPlayState(true);
       playPath().then(function(path){ return spotifyApi(path, { method: 'PUT' }).then(pollSoon); }).catch(function(err){
         state.playing = false;
         setPlayIcon(false);
+        syncBgToPlayState(false);
         showToast(friendlySpotifyError(err));
       });
       return;
@@ -1380,6 +1386,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (state.playing) return;
     state.playing = true;
     setPlayIcon(true);
+    syncBgToPlayState(true);
     var last = performance.now();
     if (state.timer) clearInterval(state.timer);
     state.timer = setInterval(function(){
@@ -1406,6 +1413,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       state.playing = false;
       lastPlayChangeAt = Date.now();
       setPlayIcon(false);
+      syncBgToPlayState(false);
       spotifyApi('/me/player/pause', { method: 'PUT' }).then(pollSoon).catch(function(err){
         showToast(friendlySpotifyError(err));
       });
@@ -1413,6 +1421,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
     state.playing = false;
     setPlayIcon(false);
+    syncBgToPlayState(false);
     if (state.timer){ clearInterval(state.timer); state.timer = null; }
   }
 
@@ -3149,6 +3158,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
     state.playing = true;
     setPlayIcon(true);
+    syncBgToPlayState(true);
     (withContext ? put(withContext) : put(trackOnly)).catch(function(err){
       if (withContext && !(err && (err.reason === 'NO_ACTIVE_DEVICE' || err.status === 404 || err.reauthRequired))) {
         return put(trackOnly); // context rejected: play just the track
@@ -3158,6 +3168,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       pendingSaved = saved; // let the next Play press try again
       state.playing = false;
       setPlayIcon(false);
+      syncBgToPlayState(false);
       showToast(friendlySpotifyError(err));
     });
     return true;
@@ -3193,6 +3204,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (Date.now() - lastPlayChangeAt > PLAY_GRACE_MS) {
       state.playing = !!s.is_playing;
       setPlayIcon(state.playing);
+      syncBgToPlayState(state.playing);
     }
     renderRealProgress();
     if (Date.now() - lastShuffleChangeAt > REAL_STATE_GRACE_MS) $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
