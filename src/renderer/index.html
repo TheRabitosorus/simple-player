@@ -153,7 +153,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    space. Equalize the padding so it's actually centered. */
 #app.idle #swipeZone{padding-right:20px;padding-left:20px;padding-top:20px;}
 /* Idle volume bar — positionné dans #swipeZone pour couvrir 15%-85% de la hauteur totale du player. */
-#idleVolBar{position:absolute;width:5px;top:15%;bottom:15%;right:22px;background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;z-index:2;}
+#idleVolBar{position:absolute;width:5px;top:15%;bottom:15%;background:rgba(255,255,255,.15);border-radius:3px;opacity:0;transition:opacity .22s ease;pointer-events:none;z-index:2;}
 #app.idle.volume-revealed #idleVolBar{opacity:1;}
 #idleVolIcon{position:absolute;top:-38px;left:50%;transform:translateX(-50%);width:28px;height:28px;color:var(--fg-dim);}
 #idleVolIcon svg{width:100%;height:100%;}
@@ -1033,17 +1033,30 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $likedBadge.title = liked ? 'Liked / in a playlist' : 'Not liked';
   }
 
-  // ---- Canvas blob background — style Spotify fullscreen ----
-  // Des blobs de couleur extraits de la pochette dérivent de façon indépendante,
-  // floutés et fondus ensemble via filter:blur sur le canvas.
+  // ---- Canvas background — style Spotify fullscreen ----
+  // Un dégradé fluide dont une tache lumineuse douce orbite lentement sur fond coloré.
+  // Même rendu que le background_anim.mp4 de référence : lumière diffuse, pas de blobs visibles,
+  // transition couleur douce basée sur les teintes dominantes de la pochette.
   var $npBackground = document.getElementById('npBackground');
   var $npBgCanvas   = document.getElementById('npBgCanvas');
   var _bgCtx        = $npBgCanvas.getContext('2d');
-  var _bgBlobs      = [];       // [{x,y,vx,vy,r,color,phase}]
   var _bgRafId      = null;     // requestAnimationFrame handle
   var _bgColors     = ['#1a1a2e','#16213e','#0f3460']; // fallback sombre
   var _idleArtBottom = 0; // coordonnée Y du bas de la pochette dans swipeZone (maj par fitArtSquare)
-  var BG_SPEEDS     = { normal: 0.12, medium: 0.28, fast: 0.55 }; // px/frame normalisé
+  var _bgTick       = 0;  // compteur de frames pour les orbites
+  // Vitesse angulaire par paramètre bgAnimated (radians/frame)
+  var BG_SPEEDS     = { normal: 0.0008, medium: 0.0020, fast: 0.0045 };
+
+  // Spotlights orbitaux : chacun décrit une ellipse autour du centre de la scène.
+  // Paramètres fixes — les couleurs seront mises à jour par updateBgSpotlights().
+  var _bgSpots = [
+    // spotlight principal — grande orbite lente en haut
+    { cx:0.5, cy:0.38, rx:0.42, ry:0.28, phase:0,           speed:1.0,  r:1.5,  alpha:0.55, color:'#1a3a6e' },
+    // spotlight secondaire — orbite inversée, basse
+    { cx:0.5, cy:0.62, rx:0.38, ry:0.22, phase:Math.PI,     speed:0.73, r:1.3,  alpha:0.42, color:'#0d2240' },
+    // accent léger — petite orbite rapide, coin haut-droit
+    { cx:0.72, cy:0.3, rx:0.22, ry:0.18, phase:Math.PI*0.5, speed:1.35, r:0.9,  alpha:0.30, color:'#0a0a0a' },
+  ];
 
   // Extraire N couleurs dominantes d'une image via canvas (down-sample + k-means simplifié)
   function extractColors(imgEl, n){
@@ -1066,32 +1079,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var colors = [];
     for (var j = 0; j < Math.min(n, sorted.length); j++){
       var rgb = sorted[j].split(',');
-      // Assombrir légèrement pour que le fond reste discret
-      var rf = Math.round(+rgb[0] * 0.7);
-      var gf = Math.round(+rgb[1] * 0.7);
-      var bf = Math.round(+rgb[2] * 0.7);
+      // Assombrir pour que le fond reste discret — les teintes claires doivent rester subtiles
+      var rf = Math.round(+rgb[0] * 0.65);
+      var gf = Math.round(+rgb[1] * 0.65);
+      var bf = Math.round(+rgb[2] * 0.65);
       colors.push('rgb(' + rf + ',' + gf + ',' + bf + ')');
     }
     return colors.length >= 2 ? colors : ['#1a1234','#0d2240'];
   }
 
-  function initBlobs(colors){
-    var W = $npBgCanvas.width, H = $npBgCanvas.height;
-    _bgBlobs = [];
-    var nBlobs = 6;
-    for (var i = 0; i < nBlobs; i++){
-      var angle = Math.random() * Math.PI * 2;
-      var speed = 0.3 + Math.random() * 0.5; // vitesse de base, sera modulée par BG_SPEEDS
-      _bgBlobs.push({
-        x: W * (0.1 + Math.random() * 0.8),
-        y: H * (0.1 + Math.random() * 0.8),
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        r: Math.min(W, H) * (0.35 + Math.random() * 0.35), // rayon large pour fusion
-        color: colors[i % colors.length],
-        phase: Math.random() * Math.PI * 2,      // pour la sinusoïde de dérive
-        phaseSpeed: 0.003 + Math.random() * 0.004 // vitesse de la sinusoïde
-      });
+  // Affecter les couleurs extraites aux spotlights
+  function updateBgSpotlights(colors){
+    _bgSpots[0].color = colors[0] || '#1a3a6e';
+    _bgSpots[1].color = colors[1] || '#0d2240';
+    _bgSpots[2].color = colors[2] || colors[0] || '#0d1a3a';
+    // La couleur de fond de base = version très sombre de la couleur principale
+    var c0 = _bgSpots[0].color;
+    var m = c0.match(/\d+/g);
+    if (m){
+      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.35) + ',' + Math.round(+m[1]*0.35) + ',' + Math.round(+m[2]*0.35) + ')';
+    } else {
+      _bgSpots[0]._base = '#060810';
     }
   }
 
@@ -1100,38 +1108,42 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       _bgRafId = null; return;
     }
     var W = $npBgCanvas.width, H = $npBgCanvas.height;
-    var speedMult = BG_SPEEDS[settings.bgAnimated] || 0.28;
-    // Fond sombre
-    _bgCtx.clearRect(0, 0, W, H);
-    _bgCtx.fillStyle = '#080808';
+    var angSpeed = BG_SPEEDS[settings.bgAnimated] || BG_SPEEDS.medium;
+    _bgTick++;
+
+    // Fond de base : couleur sombre extraite de la pochette
+    _bgCtx.fillStyle = _bgSpots[0]._base || '#060810';
     _bgCtx.fillRect(0, 0, W, H);
-    // Dessiner chaque blob avec radialGradient
-    for (var i = 0; i < _bgBlobs.length; i++){
-      var b = _bgBlobs[i];
-      // Dérive sinusoïdale perpendiculaire + direction principale
-      b.phase += b.phaseSpeed * speedMult * 4;
-      var perpX = -b.vy / (Math.sqrt(b.vx*b.vx + b.vy*b.vy) || 1);
-      var perpY =  b.vx / (Math.sqrt(b.vx*b.vx + b.vy*b.vy) || 1);
-      var drift = Math.sin(b.phase) * 0.6 * speedMult;
-      b.x += b.vx * speedMult + perpX * drift;
-      b.y += b.vy * speedMult + perpY * drift;
-      // Rebond doux sur les bords
-      if (b.x < -b.r * 0.3){ b.vx = Math.abs(b.vx); }
-      if (b.x > W + b.r * 0.3){ b.vx = -Math.abs(b.vx); }
-      if (b.y < -b.r * 0.3){ b.vy = Math.abs(b.vy); }
-      if (b.y > H + b.r * 0.3){ b.vy = -Math.abs(b.vy); }
-      // Radial gradient = blob flou
-      var grd = _bgCtx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
-      grd.addColorStop(0,   b.color.replace('rgb(','rgba(').replace(')',',0.45)'));
-      grd.addColorStop(0.5, b.color.replace('rgb(','rgba(').replace(')',',0.18)'));
-      grd.addColorStop(1,   b.color.replace('rgb(','rgba(').replace(')',',0)'));
+
+    // Dessiner chaque spotlight orbital
+    for (var i = 0; i < _bgSpots.length; i++){
+      var s = _bgSpots[i];
+      // Position sur l'ellipse : phase évolue avec le tick
+      s.phase += angSpeed * s.speed;
+      var sx = (s.cx + Math.cos(s.phase) * s.rx) * W;
+      var sy = (s.cy + Math.sin(s.phase) * s.ry) * H;
+      // Rayon du gradient = fraction de la diagonale pour couvrir toute la scène
+      var diag = Math.sqrt(W*W + H*H);
+      var gr   = diag * s.r * 0.5;
+
+      var grd = _bgCtx.createRadialGradient(sx, sy, 0, sx, sy, gr);
+      // Couleur au centre avec alpha fort, fondu vers transparent
+      var cm  = s.color.match(/\d+/g);
+      if (cm){
+        grd.addColorStop(0,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + s.alpha + ')');
+        grd.addColorStop(0.45,'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',' + (s.alpha*0.35) + ')');
+        grd.addColorStop(1,   'rgba(' + cm[0] + ',' + cm[1] + ',' + cm[2] + ',0)');
+      } else {
+        grd.addColorStop(0,   'rgba(30,60,120,' + s.alpha + ')');
+        grd.addColorStop(1,   'rgba(30,60,120,0)');
+      }
       _bgCtx.globalCompositeOperation = 'screen';
       _bgCtx.fillStyle = grd;
-      _bgCtx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
+      _bgCtx.fillRect(0, 0, W, H);
     }
     _bgCtx.globalCompositeOperation = 'source-over';
-    // Assombrissement global pour garder ça discret
-    _bgCtx.fillStyle = 'rgba(0,0,0,0.65)';
+    // Voile sombre final pour garder la lisibilité du texte
+    _bgCtx.fillStyle = 'rgba(0,0,0,0.55)';
     _bgCtx.fillRect(0, 0, W, H);
     _bgRafId = requestAnimationFrame(drawBgFrame);
   }
@@ -1143,7 +1155,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $npBgCanvas.width  = rect.width  || 400;
     $npBgCanvas.height = rect.height || 600;
     if (colors && colors.length) _bgColors = colors;
-    initBlobs(_bgColors);
+    updateBgSpotlights(_bgColors);
     _bgRafId = requestAnimationFrame(drawBgFrame);
   }
 
@@ -1283,6 +1295,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       idleZone.style.width  = '';
       idleZone.style.top    = '0';
       idleZone.style.bottom = (swEl2.offsetHeight - artBottom) + 'px';
+      // Centrer le track de volume horizontalement dans la bande droite (artRight → bord droit)
+      var volBar = document.getElementById('idleVolBar');
+      if (volBar) {
+        var stripW  = swEl2.offsetWidth - artRight; // largeur de la bande orange
+        var barW    = volBar.offsetWidth || 5;
+        var centreX = artRight + (stripW / 2); // centre de la bande en px depuis gauche de swipeZone
+        volBar.style.right = '';
+        volBar.style.left  = Math.round(centreX - barW / 2) + 'px';
+      }
     }
     // Position the liked badge and + button in idle mode.
     var $lb = document.getElementById('likedBadge');
@@ -1326,8 +1347,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var rect = $npBackground.getBoundingClientRect();
     $npBgCanvas.width  = rect.width  || 400;
     $npBgCanvas.height = rect.height || 600;
-    // Réinitialiser les positions des blobs pour le nouveau format
-    if (_bgColors.length) initBlobs(_bgColors);
+    // Réinitialiser les spotlights pour le nouveau format
+    if (_bgColors.length) updateBgSpotlights(_bgColors);
   });
 
   function play(){

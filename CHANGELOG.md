@@ -2,9 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.63 — 26 octobre 2026
+
+- **Animation background refaite — style vidéo de référence.** Remplacé les blobs flottants par un système de **spotlights orbitaux** : 3 gradients radiaux très larges et très doux dont les centres décrivent des ellipses lentes, en mode `screen`. Résultat : une tache lumineuse douce qui voyage lentement sur un fond teinté — exactement comme l'animation Spotify de la vidéo. Pas de blobs visibles, transitions fluides et imperceptibles. Les vitesses `normal/medium/fast` restent disponibles.
+
 ## v1.20.62 — 24 octobre 2026
 
 - **Canvas background clippé.** Ajout de `overflow:hidden` sur `#app` — les blobs canvas ne débordent plus à l'extérieur de la fenêtre du player.
+- **Slider volume centré dynamiquement.** Le track vertical est maintenant positionné par JS dans `fitArtSquare()` : centré dans la bande entre le bord droit de la pochette et le bord droit de l'application, quelle que soit la taille de la fenêtre.
 
 ## v1.20.61 — 24 octobre 2026
 
