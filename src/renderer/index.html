@@ -1047,17 +1047,30 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Vitesse angulaire par paramètre bgAnimated (radians/frame)
   var BG_SPEEDS     = { normal: 0.0008, medium: 0.0020, fast: 0.0045 };
 
-  // Spotlights orbitaux : chacun décrit une ellipse autour du centre de la scène.
-  // Paramètres fixes — les couleurs seront mises à jour par updateBgSpotlights().
+  // Nombres irrationnels utilisés comme fréquences de translation — garantit l'apériodicité
+  var _PHI  = 1.6180339887; // nombre d'or
+  var _SR2  = 1.4142135623; // √2
+  var _SR3  = 1.7320508075; // √3
+  var _SR5  = 2.2360679774; // √5
+  var _SR7  = 2.6457513110; // √7
+  var _SR11 = 3.3166247903; // √11
+
+  // Spotlights orbitaux : orbite elliptique + dérive par sinus à fréquences irrationnelles.
+  // tx/ty = amplitude de dérive (fraction de la scène), f1/f2/f3 = fréquences de modulation.
+  // Les couleurs seront mises à jour par updateBgSpotlights().
   var _bgSpots = [
-    // spotlight principal — grand, lent, couvre la moitié supérieure
-    { cx:0.5, cy:0.35, rx:0.45, ry:0.30, phase:0,            speed:1.0,  r:1.1,  alpha:1.0,  color:'#1a3a6e' },
-    // spotlight secondaire — couleur 2, orbite inverse
-    { cx:0.5, cy:0.65, rx:0.40, ry:0.25, phase:Math.PI,      speed:0.73, r:1.0,  alpha:0.95, color:'#0d2240' },
-    // highlight blanc — tache lumineuse claire qui voyage
-    { cx:0.5, cy:0.45, rx:0.30, ry:0.22, phase:Math.PI*0.7,  speed:1.15, r:0.6,  alpha:0.85, color:'#e8eeff' },
-    // couleur 3 — bord gauche
-    { cx:0.25, cy:0.55, rx:0.22, ry:0.18, phase:Math.PI*1.5, speed:0.9,  r:0.85, alpha:0.90, color:'#0d1a3a' },
+    // spotlight principal — grand, lent
+    { cx:0.5,  cy:0.35, rx:0.40, ry:0.28, phase:0,           speed:1.0,  r:1.1,  alpha:1.0,  color:'#1a3a6e',
+      tx:0.18, ty:0.14, f1:_PHI,  f2:_SR3,  f3:_SR7,  scaleF:_SR2,  scaleA:0.12, p1:0.0,    p2:2.1,    p3:4.7  },
+    // spotlight secondaire — orbite inverse
+    { cx:0.5,  cy:0.65, rx:0.38, ry:0.24, phase:Math.PI,     speed:0.73, r:1.0,  alpha:0.95, color:'#0d2240',
+      tx:0.22, ty:0.17, f1:_SR2,  f2:_SR5,  f3:_PHI,  scaleF:_SR3,  scaleA:0.10, p1:1.3,    p2:3.8,    p3:0.9  },
+    // highlight clair — voyage vite, petite zone
+    { cx:0.5,  cy:0.45, rx:0.28, ry:0.20, phase:Math.PI*0.7, speed:1.15, r:0.6,  alpha:0.85, color:'#e8eeff',
+      tx:0.25, ty:0.20, f1:_SR7,  f2:_PHI,  f3:_SR11, scaleF:_SR5,  scaleA:0.15, p1:5.1,    p2:1.7,    p3:3.3  },
+    // couleur 3 — dérive lente vers les bords
+    { cx:0.28, cy:0.58, rx:0.20, ry:0.16, phase:Math.PI*1.5, speed:0.9,  r:0.85, alpha:0.90, color:'#0d1a3a',
+      tx:0.20, ty:0.22, f1:_SR11, f2:_SR2,  f3:_SR3,  scaleF:_PHI,  scaleA:0.13, p1:2.6,    p2:5.4,    p3:1.1  },
   ];
 
   // Extraire N couleurs dominantes d'une image via canvas (down-sample + k-means simplifié)
@@ -1111,9 +1124,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (!settings.bgEnabled || settings.bgAnimated === 'off'){
       _bgRafId = null; return;
     }
-    var W = $npBgCanvas.width, H = $npBgCanvas.height;
+    // Lire les dimensions CSS (le contexte est déjà scalé par dpr via setTransform)
+    var W = parseInt($npBgCanvas.style.width)  || $npBgCanvas.width;
+    var H = parseInt($npBgCanvas.style.height) || $npBgCanvas.height;
     var angSpeed = BG_SPEEDS[settings.bgAnimated] || BG_SPEEDS.medium;
     _bgTick++;
+    // Temps normalisé — vitesse de translation proportionnelle à angSpeed
+    var t = _bgTick * angSpeed * 0.8;
 
     // Fond de base : couleur sombre extraite de la pochette
     _bgCtx.fillStyle = _bgSpots[0]._base || '#060810';
@@ -1122,13 +1139,28 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // Dessiner chaque spotlight orbital
     for (var i = 0; i < _bgSpots.length; i++){
       var s = _bgSpots[i];
-      // Position sur l'ellipse : phase évolue avec le tick
+      // 1. Orbite elliptique classique (rotation)
       s.phase += angSpeed * s.speed;
-      var sx = (s.cx + Math.cos(s.phase) * s.rx) * W;
-      var sy = (s.cy + Math.sin(s.phase) * s.ry) * H;
-      // Rayon du gradient = fraction de la diagonale pour couvrir toute la scène
+
+      // 2. Dérive apériodique par superposition de 3 sinus à fréquences irrationnelles
+      //    f1, f2, f3 sont √2, √3, φ… → jamais en phase → jamais de répétition visible
+      var driftX = Math.sin(t * s.f1 + s.p1) * 0.50
+                 + Math.sin(t * s.f2 + s.p2) * 0.30
+                 + Math.sin(t * s.f3 + s.p3) * 0.20;
+      var driftY = Math.cos(t * s.f2 + s.p1 + 1.1) * 0.50
+                 + Math.cos(t * s.f3 + s.p2 + 2.3) * 0.30
+                 + Math.cos(t * s.f1 + s.p3 + 0.7) * 0.20;
+
+      // 3. Variation de scale légère (gradient plus grand/plus petit)
+      var scaleMod = 1.0 + Math.sin(t * s.scaleF + s.p1 * 1.7) * s.scaleA;
+
+      // Position finale = orbite + translation
+      var sx = (s.cx + Math.cos(s.phase) * s.rx + driftX * s.tx) * W;
+      var sy = (s.cy + Math.sin(s.phase) * s.ry + driftY * s.ty) * H;
+
+      // Rayon du gradient modulé
       var diag = Math.sqrt(W*W + H*H);
-      var gr   = diag * s.r * 0.5;
+      var gr   = diag * s.r * 0.5 * scaleMod;
 
       var grd = _bgCtx.createRadialGradient(sx, sy, 0, sx, sy, gr);
       // Convertir la couleur (hex ou rgb(...)) en composantes r,g,b
@@ -1159,10 +1191,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function startBgCanvas(colors){
     if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    // Dimensionner le canvas à la taille réelle de l'élément
+    // Dimensionner le canvas en pixels physiques (×dpr) pour éviter le flou/banding
     var rect = $npBackground.getBoundingClientRect();
-    $npBgCanvas.width  = rect.width  || 400;
-    $npBgCanvas.height = rect.height || 600;
+    var dpr  = window.devicePixelRatio || 1;
+    var cssW = rect.width  || 400;
+    var cssH = rect.height || 600;
+    $npBgCanvas.width  = Math.round(cssW * dpr);
+    $npBgCanvas.height = Math.round(cssH * dpr);
+    // Le canvas CSS reste à la taille de l'élément
+    $npBgCanvas.style.width  = cssW + 'px';
+    $npBgCanvas.style.height = cssH + 'px';
+    // Scaler le contexte pour que les coordonnées restent en CSS px dans drawBgFrame
+    _bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (colors && colors.length) _bgColors = colors;
     updateBgSpotlights(_bgColors);
     _bgRafId = requestAnimationFrame(drawBgFrame);
@@ -1170,9 +1210,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   function stopBgCanvas(){
     if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    _bgCtx.clearRect(0, 0, $npBgCanvas.width, $npBgCanvas.height);
+    // Utiliser les dimensions CSS (le contexte est scalé par dpr dans startBgCanvas)
+    var cw = parseInt($npBgCanvas.style.width)  || $npBgCanvas.width;
+    var ch = parseInt($npBgCanvas.style.height) || $npBgCanvas.height;
+    _bgCtx.clearRect(0, 0, cw, ch);
     _bgCtx.fillStyle = '#0a0a0a';
-    _bgCtx.fillRect(0, 0, $npBgCanvas.width, $npBgCanvas.height);
+    _bgCtx.fillRect(0, 0, cw, ch);
   }
 
   function applyBgAnimation(){

@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.20.71 — 27 octobre 2026
+
+- **Animation background — résolution physique (HiDPI).** Canvas dimensionné en pixels physiques (×`devicePixelRatio`) au lieu de CSS px. Sur un écran 2× le canvas avait la moitié de la résolution utile, ce qui créait des bandes visibles dans les dégradés. Le contexte est scalé via `setTransform(dpr,…)` pour que toutes les coordonnées restent en CSS px dans le code de dessin.
+
+## v1.20.70 — 27 octobre 2026
+
+- **Animation background — mouvement apériodique.** Chaque spotlight combine désormais : orbite elliptique (rotation) + dérive en translation par superposition de 3 sinus à fréquences irrationnelles (φ, √2, √3, √5, √7, √11) + variation de scale légère. Les fréquences irrationnelles garantissent mathématiquement que le pattern ne se répète jamais à l'échelle humaine. Chaque spotlight a ses propres fréquences et phases de départ → les combinaisons sont infinies.
+
 ## v1.20.69 — 27 octobre 2026
 
 - **Animation background — bug critique : couleurs hex mal parsées.** `.match(/\d+/g)` sur `'#1a3a6e'` ne donne pas les composantes RGB (ça extrait juste `['1', '3', '6']`), donc tous les gradients étaient quasi-noirs. Fix : parsing hex correct via `parseInt(hexM[n], 16)` avec fallback rgb(). C'était la vraie cause du blocage visuel — l'animation tournait bien mais ne dessinait rien de visible.
