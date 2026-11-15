@@ -1,7 +1,7 @@
 {
   "name": "simple-player",
-  "version": "1.20.75",
-  "description": "Lecteur Spotify minimaliste pour Windows - gros boutons, tactile, swipe",
+  "version": "1.21.2",
+  "description": "Lecteur Spotify et fichiers locaux (MP3, FLAC) minimaliste pour Windows - gros boutons, tactile, swipe",
   "main": "src/main.js",
   "author": "Julien",
   "license": "MIT",
@@ -41,10 +41,14 @@
       "shortcutName": "Simple Player",
       "uninstallDisplayName": "Simple Player",
       "deleteAppDataOnUninstall": true,
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     },
     "files": [
       "src/**/*",
+      "build/icon.ico",
+      "build/icon_tray.png",
       "package.json"
     ]
   }

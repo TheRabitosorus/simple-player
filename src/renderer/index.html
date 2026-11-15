@@ -2,8 +2,9 @@
 <meta charset="utf-8">
 <!-- Content Security Policy: this page only ever talks to Spotify's API and
      loads fonts/cover art over https; no remote scripts. Inline script/style
-     are needed because the whole UI lives in this one file. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; connect-src https://api.spotify.com; base-uri 'none'; form-action 'none'">
+     are needed because the whole UI lives in this one file. media-src file: is
+     for the local music files of the "Local" tab, played straight from disk. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; media-src file:; connect-src https://api.spotify.com; base-uri 'none'; form-action 'none'">
 <title>Simple Player</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
@@ -28,6 +29,12 @@
   --vol-track-w: 9px;
   --morph-dur: .6s;
   --morph-ease: cubic-bezier(.4,0,.2,1);
+  /* 1% of the layout viewport. Equal to 1vw/1vh on a big window; on a small
+     one the whole interface is laid out at a minimum design size and scaled
+     down to fit (see applyUiScale in the script), and these follow that
+     design size instead of the real window. Use them instead of vw/vh. */
+  --vw: 1vw;
+  --vh: 1vh;
   color-scheme: dark;
 }
 *{box-sizing:border-box;}
@@ -44,14 +51,16 @@ body{
 button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;}
 .px{padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));}
 
-#app{height:100%;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+/* Fixed to the window. On small windows applyUiScale() gives it a larger
+   explicit size plus a scale() transform so everything shrinks together. */
+#app{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;transform-origin:0 0;}
 
 .playlist-badge{
   position:absolute;z-index:2;
   top:max(14px, env(safe-area-inset-top,0px));
   left:max(16px, env(safe-area-inset-left,0px));
   font-size:11px;font-weight:700;color:var(--fg-dim);background:var(--bg-elev-2);
-  padding:6px 12px;border-radius:20px;white-space:nowrap;max-width:38vw;overflow:hidden;text-overflow:ellipsis;
+  padding:6px 12px;border-radius:20px;white-space:nowrap;max-width:calc(38 * var(--vw));overflow:hidden;text-overflow:ellipsis;
   border:1px solid var(--border);
 }
 /* ---------- Views ---------- */
@@ -68,7 +77,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #swipeZone{position:relative;
   flex:1 1 auto;min-height:0;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:clamp(14px,3vh,28px);
+  gap:clamp(14px,calc(3 * var(--vh)),28px);
   padding:36px calc(var(--rail-w) + 62px) 16px calc(var(--rail-w) + 62px);
   transition:padding .25s ease;
   /* We handle both the horizontal (track swipe) and vertical (volume)
@@ -172,7 +181,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 /* In normal mode: removed from flow, positioned by fitArtSquare() */
 /* Shift left by half the asymmetry (padding-right − padding-left) so the badge
    lands on the same vertical axis as play/pause, not the full swipeZone centre */
-#likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:none;}
+#likedBadge{position:absolute;left:50%;transform:translateX(-50%);z-index:2;pointer-events:auto;cursor:pointer;}
+/* The tick opens the playlist chooser, like the "+" button: give the finger a
+   bit more room than the 22px icon (sideways mostly, the cover is just below). */
+#likedBadge::before{content:'';position:absolute;inset:-5px -18px;}
 /* In idle mode the padding is symmetric (20px each side), so 50% is correct */
 #app.idle #likedBadge{left:50%;}
 /* In idle mode the tick IS the add-to-playlist button — make it interactive */
@@ -213,16 +225,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
 
 #trackInfo{
-  text-align:center;max-width:min(80vw,420px);flex:0 0 auto;
+  text-align:center;max-width:min(calc(80 * var(--vw)),420px);flex:0 0 auto;
   display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;
   transition:max-width var(--morph-dur) var(--morph-ease),
              flex var(--morph-dur) var(--morph-ease),
              margin var(--morph-dur) var(--morph-ease);
 }
-#app.idle #trackInfo{flex:0 0 auto;max-width:min(90vw,540px);margin-top:-29px;padding-bottom:0;overflow:hidden;}
+#app.idle #trackInfo{flex:0 0 auto;max-width:min(calc(90 * var(--vw)),540px);margin-top:-29px;padding-bottom:0;overflow:hidden;}
 #trackTitle{
   font-family:var(--display-font);font-weight:600;font-style:italic;
-  font-size:clamp(20px,3.6vw,28px);margin:0 0 4px;line-height:1.15;
+  font-size:clamp(20px,calc(3.6 * var(--vw)),28px);margin:0 0 4px;line-height:1.15;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   transition:font-size var(--morph-dur) var(--morph-ease),
              margin var(--morph-dur) var(--morph-ease);
@@ -232,8 +244,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   transition:font-size var(--morph-dur) var(--morph-ease);
 }
-#app.idle #trackTitle{font-size:clamp(36px,6vw,56px);margin-bottom:8px;}
-#app.idle #trackArtist{font-size:clamp(22px,3.5vw,32px);}
+/* Without this, a long title is as wide as its text (flex item centred on the
+   cross axis): it ran across the whole window, over the volume bar, and the
+   ellipsis above never applied. */
+#trackTitle,#trackArtist{max-width:100%;}
+#app.idle #trackTitle{font-size:clamp(36px,calc(6 * var(--vw)),56px);margin-bottom:8px;}
+#app.idle #trackArtist{font-size:clamp(22px,calc(3.5 * var(--vw)),32px);}
 
 /* The wrap itself is the touch target: a bar is only 8px high, so generous
    invisible padding around it (22px above/below, 24px each side, cancelled by
@@ -241,14 +257,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
    It must be padding, not a ::before overflow: the wrap clips its overflow
    (needed for the idle collapse), which used to cut the old hit area off and
    let a drag along the bar fall through to the swipe-to-change-track zone. */
-#progressWrap{width:min(78vw,420px);flex:0 0 auto;box-sizing:content-box;padding:22px 24px;margin:-12px -24px;touch-action:none;cursor:pointer;}
+#progressWrap{width:min(calc(78 * var(--vw)),420px);flex:0 0 auto;box-sizing:content-box;padding:22px 24px;margin:-12px -24px;touch-action:none;cursor:pointer;}
 #progressBar{height:8px;border-radius:4px;background:var(--bg-elev-2);cursor:pointer;touch-action:none;position:relative;}
 /* Same trick as the volume rail: a wider, invisible hit area layered
    over the thin visible bar, so a finger has real room to land on it. */
 #progressFill{height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .18s linear;}
 #timeRow{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono-font);font-variant-numeric:tabular-nums;font-size:28px;color:var(--fg-dim);}
 
-#transport{display:flex;align-items:center;justify-content:center;gap:clamp(10px,3vw,26px);flex:0 0 auto;}
+#transport{display:flex;align-items:center;justify-content:center;gap:clamp(10px,calc(3 * var(--vw)),26px);flex:0 0 auto;}
 .ctrl{display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--fg);flex:0 0 auto;transition:background .12s,color .12s,transform .08s;}
 .ctrl:active{transform:scale(.92);}
 /* Remove the browser focus ring after a touch/click — keep it for keyboard nav */
@@ -270,7 +286,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 
 /* -- Library / Search views -- */
-#view-library .scroller,#view-search .scroller,#view-settings .scroller{flex:1 1 auto;min-height:0;overflow-y:auto;padding-bottom:18px;}
+#view-library .scroller,#view-search .scroller,#view-settings .scroller,#view-local .scroller{flex:1 1 auto;min-height:0;overflow-y:auto;padding-bottom:18px;}
 .view h2{font-family:var(--display-font);font-style:italic;font-weight:600;font-size:22px;margin:16px 0 4px;}
 .lib-section h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--fg-faint);margin:22px 0 10px;font-weight:700;}
 
@@ -349,6 +365,32 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .pill:hover{background:var(--bg-elev-2);color:var(--fg);}
 .pill.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
 
+/* -- Local files view -- */
+.local-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
+.local-btn{padding:16px 24px;border-radius:14px;background:var(--bg-elev);border:1px solid var(--border);font-size:18px;font-weight:700;color:var(--fg);white-space:nowrap;}
+.local-btn:hover{background:var(--bg-elev-2);}
+.local-btn:active{transform:scale(.97);}
+.local-btn.primary{background:var(--accent);border-color:var(--accent);color:#06130c;}
+.local-btn.primary:hover{filter:brightness(1.08);background:var(--accent);}
+.local-drop{margin-top:16px;padding:30px 16px;border:2px dashed var(--border);border-radius:16px;text-align:center;color:var(--fg-faint);font-size:16px;line-height:1.5;}
+.local-count{font-size:13px;color:var(--fg-faint);margin:14px 4px 0;}
+.local-btn:disabled{opacity:.45;cursor:default;}
+.local-drop.busy{border-style:solid;color:var(--fg-dim);}
+.track-row .sub .q{color:var(--accent);font-family:var(--mono-font);font-size:14px;}
+.track-row.missing{opacity:.45;}
+.track-row.local{cursor:pointer;}
+/* Artist (shortened with … if needed) followed by the quality, always visible. */
+.track-row.local .sub{display:flex;}
+.track-row.local .who{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.track-row.local .q{flex:0 0 auto;white-space:pre;}
+/* Shown while files are dragged over the window. */
+#dropOverlay{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:rgba(10,12,12,.82);border:4px dashed var(--accent);border-radius:22px;pointer-events:none;
+  font-size:26px;font-weight:800;color:var(--accent);text-align:center;}
+/* Shown while files are dragged over the window. */
+#dropOverlay{position:fixed;inset:0;z-index:150;background:rgba(10,12,12,.86);display:flex;align-items:center;justify-content:center;pointer-events:none;}
+#dropOverlay div{border:3px dashed var(--accent);border-radius:24px;padding:40px 48px;font-size:24px;font-weight:700;color:var(--fg);text-align:center;max-width:80%;}
+
 .search-bar{position:relative;margin-top:14px;flex:0 0 auto;}
 .search-bar svg{position:absolute;left:20px;top:50%;transform:translateY(-50%);width:26px;height:26px;color:var(--fg-faint);}
 .search-bar input{
@@ -391,7 +433,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 #addMenu{
   position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
-  min-width:360px;max-width:480px;max-height:60vh;overflow-y:auto;
+  min-width:360px;max-width:480px;max-height:calc(60 * var(--vh));overflow-y:auto;
   background:var(--bg-elev-2);border:1px solid var(--border);border-radius:18px;
   padding:10px;box-shadow:0 16px 40px -12px rgba(0,0,0,.6);z-index:40;
 }
@@ -459,14 +501,17 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   padding-bottom:max(10px, env(safe-area-inset-bottom,0px));padding-top:8px;
   position:relative;
 }
+/* Five equal slots, centred on the window: an empty one, Search, Player,
+   Library, Local — so Player (the middle slot) stays on the centre line, under
+   the play and "+" buttons, and Local sits between Library and the gear.
+   The gap shrinks on narrow windows so Local always stops 8px short of the
+   gear: 2 slots + 2 gaps + half a slot must fit between the centre line and
+   the gear's left edge (50% - rail/2 - 63px). */
 #tabbar .px{
-  display:flex;justify-content:center;gap:clamp(24px,10vw,70px);
-  /* Mirrors #swipeZone's own left/right padding exactly, so this row's
-     centered middle item (Library) lines up under the "+" button above,
-     which is centered within that same reserved-for-the-volume-rail
-     content width, not the window's true center. */
-  padding-left:calc(var(--rail-w) + 62px);padding-right:calc(var(--rail-w) + 62px);
+  display:flex;justify-content:center;padding-left:0;padding-right:0;
+  gap:clamp(2px, calc(25 * var(--vw) - var(--rail-w) / 4 - 141px), 70px);
 }
+.tab,.tab-spacer{width:84px;flex:0 0 84px;}
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
   right:calc(var(--rail-w)/2 - 1px + max(0px, env(safe-area-inset-right,0px)));
@@ -476,7 +521,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 }
 .tabbar-gear:hover{background:var(--bg-elev-2);color:var(--fg);}
 .tabbar-gear svg{width:48px;height:48px;}
-.tab{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--fg-faint);padding:6px 10px;border-radius:14px;min-width:80px;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--fg-faint);padding:6px 0;border-radius:14px;}
 .tab svg{width:48px;height:48px;}
 .tab span{font-size:18px;font-weight:700;letter-spacing:.2px;}
 .tab.active{color:var(--accent);}
@@ -602,6 +647,23 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       </div>
     </section>
 
+    <!-- Fichiers locaux -->
+    <section id="view-local" class="view">
+      <div class="scroller px">
+        <h2>Local files</h2>
+        <p class="settings-desc">Play music stored on this computer: MP3, FLAC, WAV, OGG, Opus, M4A/AAC. Add files or a whole folder (an artist, an album), or drop them anywhere on this window.</p>
+        <div class="local-actions">
+          <button class="local-btn primary" id="localAddFilesBtn">Add files…</button>
+          <button class="local-btn" id="localAddFolderBtn">Add folder…</button>
+          <button class="local-btn" id="localStopBtn" hidden>Stop local playback</button>
+          <button class="local-btn" id="localClearBtn" hidden>Clear list</button>
+        </div>
+        <div class="local-drop" id="localDropHint">Nothing here yet.<br>Drop music files or an artist folder here.</div>
+        <p class="local-count" id="localCount" hidden></p>
+        <div class="track-list" id="localList"></div>
+      </div>
+    </section>
+
     <!-- Réglages -->
     <section id="view-settings" class="view">
       <div class="scroller px">
@@ -667,7 +729,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             <button class="pill" data-value="off">Off</button>
             <button class="pill" data-value="on">On</button>
           </div>
-          <p class="settings-note">This setting, along with remembering the window's position and size, only works in the real Windows app — not in this preview.</p>
+          <p class="settings-note" id="startupNote">This setting, along with remembering the window's position and size, only works in the real Windows app — not in this preview.</p>
         </div>
 
         <div class="lib-section">
@@ -702,6 +764,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   <nav id="tabbar">
     <div class="px">
+      <span class="tab-spacer" aria-hidden="true"></span>
       <button class="tab" data-view="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>Search</span>
@@ -713,6 +776,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       <button class="tab" data-view="library">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="16" width="18" height="4" rx="1"/></svg>
         <span>Library</span>
+      </button>
+      <button class="tab" data-view="local">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6"/><circle cx="18.5" cy="15.5" r="2.5"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg>
+        <span>Local</span>
       </button>
     </div>
     <button class="tabbar-gear" id="settingsBtn" data-view="settings" title="Settings" aria-label="Settings">
@@ -779,7 +846,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
   // Build a safe CSS url('...') value (usable inside a style="..." attribute
   // or assigned to element.style). Only https images and our own generated
-  // data: images are allowed; anything else becomes 'none'.
+  // data: images (which includes the covers of local files) are allowed;
+  // anything else becomes 'none'.
   function cssUrl(u){
     var s = String(u || '');
     if (!/^(https:\/\/|data:image\/)/i.test(s)) return 'none';
@@ -922,13 +990,21 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var _saved = JSON.parse(localStorage.getItem('sp_settings') || '{}');
     if (typeof _saved.bgEnabled === 'boolean') settings.bgEnabled = _saved.bgEnabled;
     if (_saved.bgAnimated) settings.bgAnimated = _saved.bgAnimated;
-    if (_saved.idleDelay)  settings.idleDelay  = _saved.idleDelay;
+    if (_saved.idleDelay > 0) settings.idleDelay = +_saved.idleDelay;
+    if (_saved.volZone === 'large' || _saved.volZone === 'xlarge') settings.volZone = _saved.volZone;
   } catch (e) {}
   var RAIL_PRESETS = {
     normal: { rail: '68px', track: '9px' },
     large:  { rail: '84px', track: '16px' },
     xlarge: { rail: '104px', track: '24px' }
   };
+  // Applied right away (the saved choice is restored above), before the first layout pass.
+  function applyRailPreset(){
+    var preset = RAIL_PRESETS[settings.volZone] || RAIL_PRESETS.normal;
+    document.documentElement.style.setProperty('--rail-w', preset.rail);
+    document.documentElement.style.setProperty('--vol-track-w', preset.track);
+  }
+  applyRailPreset();
 
   // ---------------- State ----------------
   var SPEED = 7; // accélère le temps simulé pour pouvoir tester sans attendre 3-4 min
@@ -946,6 +1022,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Set by startPolling() once connected to Spotify; everything below
   // falls back to the local simulation until then.
   var useRealPlayback = false;
+  // True while the player is playing local files (the "Local" tab): the
+  // transport, progress bar and volume then drive the `local` module below
+  // instead of Spotify or the demo simulation.
+  var localMode = false;
+  function leaveLocalMode(){ if (localMode) local.exit(); }
   var onVolumeChange = null; // wired to the Windows volume (or Spotify's) below
   // Set by the idle-volume block below so the wheel handler can reveal the bar.
   var showIdleVolumeBar = null;
@@ -958,8 +1039,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (!onVolumeChange) return;
     // If the scroll target is inside a non-player view (settings, library,
     // search), let the browser handle it — don't steal it for volume.
-    var closestView = e.target && e.target.closest && e.target.closest('.view');
+    var tgt = e.target && e.target.closest ? e.target : null;
+    var closestView = tgt && tgt.closest('.view');
     if (closestView && closestView.id !== 'view-player') return;
+    // Same for the add-to-playlist menu (a long list scrolls) and for dialogs.
+    if (tgt && tgt.closest('#addMenu, #addBackdrop, #dialogBackdrop')) return;
     e.preventDefault();
     var delta = e.deltaY > 0 ? -5 : 5; // scroll down = lower, scroll up = raise
     state.volume = Math.max(0, Math.min(100, state.volume + delta));
@@ -998,6 +1082,44 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var $shuffleBtn = document.getElementById('shuffleBtn');
   var $repeatBtn = document.getElementById('repeatBtn');
   var $progressBar = document.getElementById('progressBar');
+
+  var $app = document.getElementById('app');
+  var $swipeZone = document.getElementById('swipeZone');
+
+  // ---------------- Interface scale ----------------
+  // The player is designed for a window of at least UI_BASE_W x UI_BASE_H
+  // (CSS px): below that, its fixed-size controls no longer fit and start to
+  // overlap. So on a smaller window the interface is laid out at that minimum
+  // design size and the whole of #app is scaled down to fit — every element
+  // shrinks together and keeps its place, at any window size or zoom level.
+  // At or above the design size nothing is scaled (uiScale === 1).
+  var UI_BASE_W = 640, UI_BASE_H = 720;
+  var uiScale = 1;
+  function uiMinWidth(){
+    // A wider volume rail reserves more room on both sides of the cover.
+    var rail = parseInt((RAIL_PRESETS[settings.volZone] || RAIL_PRESETS.normal).rail, 10) || 68;
+    return UI_BASE_W + 2 * (rail - 68);
+  }
+  function applyUiScale(){
+    var W = window.innerWidth, H = window.innerHeight;
+    if (!W || !H) return;
+    var u = Math.min(1, W / uiMinWidth(), H / UI_BASE_H);
+    uiScale = u;
+    if (u < 1){
+      $app.style.width = (W / u) + 'px';
+      $app.style.height = (H / u) + 'px';
+      $app.style.transform = 'scale(' + u + ')';
+    } else {
+      $app.style.width = '';
+      $app.style.height = '';
+      $app.style.transform = '';
+    }
+    // 1% of the layout size, for the CSS rules that used to rely on vw/vh.
+    var rootStyle = document.documentElement.style;
+    rootStyle.setProperty('--vw', (W / u / 100) + 'px');
+    rootStyle.setProperty('--vh', (H / u / 100) + 'px');
+  }
+  applyUiScale();
 
   var ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
   var ICON_PAUSE = '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>';
@@ -1104,43 +1226,60 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     return colors.length >= 2 ? colors : ['#1a1234','#0d2240'];
   }
 
-  // Affecter les couleurs extraites aux spotlights
+  // Convertit '#rrggbb' ou 'rgb(r,g,b)' en [r,g,b].
+  function parseRgb(c){
+    var hexM = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(c || '');
+    if (hexM) return [parseInt(hexM[1],16), parseInt(hexM[2],16), parseInt(hexM[3],16)];
+    var rgbM = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(c || '');
+    if (rgbM) return [+rgbM[1], +rgbM[2], +rgbM[3]];
+    return [30, 60, 120];
+  }
+
+  // Profil du dégradé de chaque spotlight : décroissance exponentielle douce
+  // depuis le centre (position, fraction de l'alpha) — pas de pic, pas d'anneau.
+  var BG_STOPS = [[0,1],[0.05,0.97],[0.12,0.88],[0.20,0.72],[0.30,0.52],[0.42,0.32],[0.55,0.16],[0.68,0.07],[0.82,0.02],[1,0]];
+  var _bgBase = '#060810'; // fond de base, recalculé à partir de la couleur principale
+
+  // Affecter les couleurs extraites aux spotlights. Les chaînes de couleur des
+  // dégradés sont préparées ici, une fois par pochette, et non à chaque image.
   function updateBgSpotlights(colors){
     _bgSpots[0].color = colors[0] || '#1a3a6e';
     _bgSpots[1].color = colors[1] || '#0d2240';
     _bgSpots[2].color = '#e8eeff'; // toujours un highlight clair pour la luminosité
     _bgSpots[3].color = colors[2] || colors[1] || '#0d1a3a';
+    _bgSpots.forEach(function(s){
+      var prefix = 'rgba(' + parseRgb(s.color).join(',') + ',';
+      s.stops = BG_STOPS.map(function(st){ return [st[0], prefix + (s.alpha * st[1]).toFixed(3) + ')']; });
+    });
     // Fond de base = couleur principale très sombre — les spotlights ressortent dessus
-    var c0 = _bgSpots[0].color;
-    var m = c0.match(/\d+/g);
-    if (m){
-      _bgSpots[0]._base = 'rgb(' + Math.round(+m[0]*0.18) + ',' + Math.round(+m[1]*0.18) + ',' + Math.round(+m[2]*0.18) + ')';
-    } else {
-      _bgSpots[0]._base = '#080810';
-    }
+    var b = parseRgb(_bgSpots[0].color);
+    _bgBase = 'rgb(' + Math.round(b[0]*0.18) + ',' + Math.round(b[1]*0.18) + ',' + Math.round(b[2]*0.18) + ')';
   }
 
-  function drawBgFrame(){
-    if (!settings.bgEnabled || settings.bgAnimated === 'off'){
-      _bgRafId = null; return;
-    }
-    // Lire les dimensions CSS (le contexte est déjà scalé par dpr via setTransform)
-    var W = parseInt($npBgCanvas.style.width)  || $npBgCanvas.width;
-    var H = parseInt($npBgCanvas.style.height) || $npBgCanvas.height;
+  updateBgSpotlights(_bgColors); // couleurs par défaut, tant qu'aucune pochette n'est connue
+
+  // Dessine une image du fond. advance=true fait avancer l'animation d'un pas ;
+  // advance=false redessine l'image courante (pause, animation coupée, redimensionnement).
+  // Tout est exprimé en fraction de la taille du canvas : le rendu est donc le
+  // même quelle que soit sa résolution.
+  function drawBg(advance){
+    var W = $npBgCanvas.width, H = $npBgCanvas.height;
+    if (!W || !H) return;
     var angSpeed = BG_SPEEDS[settings.bgAnimated] || BG_SPEEDS.medium;
-    _bgTick++;
+    if (advance) _bgTick++;
     // Temps normalisé — vitesse de translation proportionnelle à angSpeed
     var t = _bgTick * angSpeed * 0.8;
+    var diag = Math.sqrt(W*W + H*H);
 
-    // Fond de base : couleur sombre extraite de la pochette
-    _bgCtx.fillStyle = _bgSpots[0]._base || '#060810';
+    _bgCtx.globalCompositeOperation = 'source-over';
+    _bgCtx.fillStyle = _bgBase;
     _bgCtx.fillRect(0, 0, W, H);
 
-    // Dessiner chaque spotlight orbital
+    _bgCtx.globalCompositeOperation = 'screen';
     for (var i = 0; i < _bgSpots.length; i++){
       var s = _bgSpots[i];
       // 1. Orbite elliptique classique (rotation)
-      s.phase += angSpeed * s.speed;
+      if (advance) s.phase += angSpeed * s.speed;
 
       // 2. Dérive apériodique par superposition de 3 sinus à fréquences irrationnelles
       //    f1, f2, f3 sont √2, √3, φ… → jamais en phase → jamais de répétition visible
@@ -1157,38 +1296,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Position finale = orbite + translation
       var sx = (s.cx + Math.cos(s.phase) * s.rx + driftX * s.tx) * W;
       var sy = (s.cy + Math.sin(s.phase) * s.ry + driftY * s.ty) * H;
-
-      // Rayon du gradient modulé
-      var diag = Math.sqrt(W*W + H*H);
-      var gr   = diag * s.r * 0.5 * scaleMod;
+      var gr = diag * s.r * 0.5 * scaleMod;
 
       var grd = _bgCtx.createRadialGradient(sx, sy, 0, sx, sy, gr);
-      // Convertir la couleur (hex ou rgb(...)) en composantes r,g,b
-      var r0, g0, b0;
-      var hexM = s.color.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-      var rgbM = s.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-      if (hexM){
-        r0 = parseInt(hexM[1],16); g0 = parseInt(hexM[2],16); b0 = parseInt(hexM[3],16);
-      } else if (rgbM){
-        r0 = +rgbM[1]; g0 = +rgbM[2]; b0 = +rgbM[3];
-      } else {
-        r0 = 30; g0 = 60; b0 = 120;
-      }
-      // Décroissance exponentielle douce depuis le centre — pas de pic, pas d'anneau
-      // On simule exp(-x²/0.18) avec des stops serrés pour une courbe parfaitement lisse
-      var a = s.alpha;
-      var c = 'rgba(' + r0 + ',' + g0 + ',' + b0 + ',';
-      grd.addColorStop(0.00, c + a.toFixed(3) + ')');
-      grd.addColorStop(0.05, c + (a*0.97).toFixed(3) + ')');
-      grd.addColorStop(0.12, c + (a*0.88).toFixed(3) + ')');
-      grd.addColorStop(0.20, c + (a*0.72).toFixed(3) + ')');
-      grd.addColorStop(0.30, c + (a*0.52).toFixed(3) + ')');
-      grd.addColorStop(0.42, c + (a*0.32).toFixed(3) + ')');
-      grd.addColorStop(0.55, c + (a*0.16).toFixed(3) + ')');
-      grd.addColorStop(0.68, c + (a*0.07).toFixed(3) + ')');
-      grd.addColorStop(0.82, c + (a*0.02).toFixed(3) + ')');
-      grd.addColorStop(1.00, c + '0)');
-      _bgCtx.globalCompositeOperation = 'screen';
+      for (var k = 0; k < s.stops.length; k++) grd.addColorStop(s.stops[k][0], s.stops[k][1]);
       _bgCtx.fillStyle = grd;
       _bgCtx.fillRect(0, 0, W, H);
     }
@@ -1196,48 +1307,75 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // Voile sombre léger — juste assez pour garder le texte lisible
     _bgCtx.fillStyle = 'rgba(0,0,0,0.18)';
     _bgCtx.fillRect(0, 0, W, H);
-    _bgRafId = requestAnimationFrame(drawBgFrame);
+  }
+
+  // Ajuste la résolution du canvas à sa taille réelle à l'écran (le CSS le
+  // garde à 100 % du fond). Minimum 2× pour des dégradés parfaitement lisses,
+  // plafonné en nombre de pixels au-delà d'un écran 4K. Renvoie true si
+  // la taille a changé (le canvas est alors vide et doit être redessiné).
+  var BG_MAX_PIXELS = 3840 * 2160; // jamais plus de pixels qu'un écran 4K
+  function sizeBgCanvas(){
+    var rect = $npBackground.getBoundingClientRect();
+    if (!rect.width || !rect.height) return false; // onglet Player masqué
+    var dpr = Math.max(window.devicePixelRatio || 1, 2);
+    var pw = rect.width * dpr, ph = rect.height * dpr;
+    var over = Math.sqrt(BG_MAX_PIXELS / (pw * ph));
+    if (over < 1){ pw *= over; ph *= over; }
+    pw = Math.max(1, Math.round(pw)); ph = Math.max(1, Math.round(ph));
+    if ($npBgCanvas.width === pw && $npBgCanvas.height === ph) return false;
+    $npBgCanvas.width = pw;
+    $npBgCanvas.height = ph;
+    return true;
+  }
+
+  function isPlayerViewActive(){ return document.getElementById('view-player').classList.contains('active'); }
+  // L'animation ne tourne que si elle sert à quelque chose : fond activé,
+  // animation activée, lecture en cours, et onglet Player affiché.
+  function bgShouldAnimate(){
+    return settings.bgEnabled && settings.bgAnimated !== 'off' && state.playing && isPlayerViewActive();
+  }
+  function bgFrame(){
+    _bgRafId = null;
+    if (!bgShouldAnimate()) return;
+    drawBg(true);
+    _bgRafId = requestAnimationFrame(bgFrame);
+  }
+  // Point d'entrée unique : met le fond dans l'état voulu (animé, image fixe,
+  // ou éteint). redraw=true force le redessin de l'image fixe (nouvelles couleurs).
+  function refreshBg(redraw){
+    if (!settings.bgEnabled){ stopBgCanvas(); return; }
+    var resized = sizeBgCanvas();
+    if (bgShouldAnimate()){
+      if (resized) drawBg(false); // pas d'image vide en attendant la prochaine frame
+      if (!_bgRafId) _bgRafId = requestAnimationFrame(bgFrame);
+    } else {
+      if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
+      if (redraw || resized) drawBg(false);
+    }
   }
 
   function startBgCanvas(colors){
-    if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    // Résolution physique — minimum 2× pour que les dégradés soient parfaitement lisses
-    var rect = $npBackground.getBoundingClientRect();
-    var dpr  = Math.max(window.devicePixelRatio || 1, 2);
-    var cssW = rect.width  || 400;
-    var cssH = rect.height || 600;
-    $npBgCanvas.width  = Math.round(cssW * dpr);
-    $npBgCanvas.height = Math.round(cssH * dpr);
-    $npBgCanvas.style.width  = cssW + 'px';
-    $npBgCanvas.style.height = cssH + 'px';
-    // Scaler le contexte pour que les coordonnées restent en CSS px dans drawBgFrame
-    _bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (colors && colors.length) _bgColors = colors;
     updateBgSpotlights(_bgColors);
-    _bgRafId = requestAnimationFrame(drawBgFrame);
+    refreshBg(true);
   }
 
   function stopBgCanvas(){
     if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    // Utiliser les dimensions CSS (le contexte est scalé par dpr dans startBgCanvas)
-    var cw = parseInt($npBgCanvas.style.width)  || $npBgCanvas.width;
-    var ch = parseInt($npBgCanvas.style.height) || $npBgCanvas.height;
-    _bgCtx.clearRect(0, 0, cw, ch);
-    _bgCtx.fillStyle = '#0a0a0a';
-    _bgCtx.fillRect(0, 0, cw, ch);
+    _bgCtx.clearRect(0, 0, $npBgCanvas.width, $npBgCanvas.height); // laisse voir le fond uni de #npBackground
   }
 
-  function applyBgAnimation(){
-    if (!settings.bgEnabled || settings.bgAnimated === 'off'){
-      stopBgCanvas(); return;
-    }
-    if (!_bgRafId) startBgCanvas(null); // redémarre sans changer les couleurs
-  }
+  function applyBgAnimation(){ refreshBg(true); }
 
   function updateNpBackground(){
     if (!settings.bgEnabled){ stopBgCanvas(); return; }
     var t = currentTrack(); if (!t) return;
-    var seed = t.id + ':' + t.title;
+    bgFromSeed(t.id + ':' + t.title);
+  }
+  // Teinte le fond à partir d'une pochette générée (makeArt) : mode démo, et
+  // fichiers locaux sans pochette.
+  function bgFromSeed(seed){
+    if (!settings.bgEnabled){ stopBgCanvas(); return; }
     if (!hueCache[seed]) makeArt(seed);
     var h = hueCache[seed];
     // Mode démo (sans vraie image) : on génère des couleurs HSL à partir des teintes calculées
@@ -1262,7 +1400,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   function updatePlaylistBadge(){
     var t = currentTrack();
     var pl = t && PLAYLISTS.filter(function(p){ return p.trackIds.indexOf(t.id) !== -1; })[0];
-    if (pl){ $playlistBadge.textContent = pl.name; $playlistBadge.hidden = false; }
+    if (pl){ $playlistBadge.textContent = pl.name; $playlistBadge.hidden = false; fitPlaylistBadge(); }
     else { $playlistBadge.hidden = true; }
   }
 
@@ -1283,17 +1421,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $art.classList.toggle('paused', !playing);
   }
 
-  // Synchronise l'animation background avec l'état de lecture.
-  // Appelé explicitement par play() et pause() — pas par setPlayIcon
-  // (qui est aussi appelé lors d'initialisations sans changement d'état réel).
-  function syncBgToPlayState(playing){
-    if (!settings.bgEnabled || settings.bgAnimated === 'off') return;
-    if (playing){
-      if (!_bgRafId) _bgRafId = requestAnimationFrame(drawBgFrame);
-    } else {
-      if (_bgRafId){ cancelAnimationFrame(_bgRafId); _bgRafId = null; }
-    }
-  }
+  // Synchronise l'animation background avec l'état de lecture (state.playing
+  // doit déjà être à jour). Appelé explicitement par play() et pause() — pas
+  // par setPlayIcon, aussi appelé lors d'initialisations sans changement réel.
+  function syncBgToPlayState(){ refreshBg(false); }
 
   // Keeps #art a true square at all times, in both normal and idle mode,
   // at any window size or interface zoom level. Rather than relying on
@@ -1306,59 +1437,55 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var $trackInfo = document.getElementById('trackInfo');
   function fitArtSquare(){
     if (!$artWrap.getClientRects().length) return; // hidden (e.g. a different tab is active)
-    var rect = $artWrap.getBoundingClientRect();
-    var isIdle = document.getElementById('app').classList.contains('idle');
+    var isIdle = $app.classList.contains('idle');
+    // Everything here is measured with offset* (layout pixels, relative to
+    // #swipeZone): unlike getBoundingClientRect, those are not affected by
+    // the interface scale nor by the transforms of the idle morph.
+    var wrapW = $artWrap.offsetWidth, wrapH = $artWrap.offsetHeight;
+    var wrapLeft = $artWrap.offsetLeft, wrapTop = $artWrap.offsetTop;
+    var swW = $swipeZone.offsetWidth, swH = $swipeZone.offsetHeight;
     var cap = isIdle ? 560 : 520;
-    // In idle mode, always leave at least 80px to the right of the cover for
-    // the volume strip, even if it means shrinking the art a little.
-    var maxW = isIdle ? rect.width - 80 : rect.width;
-    var size = Math.max(40, Math.min(cap, maxW, rect.height));
+    // In idle mode, always leave room on each side of the cover (60px + the
+    // zone's own 20px padding) for the volume strip and its "100%" label,
+    // even if it means shrinking the art a little.
+    var maxW = isIdle ? wrapW - 120 : wrapW;
+    var size = Math.min(cap, maxW, wrapH);
 
     if (isIdle) {
       // Reserve space for title+artist below the art so they never overlap.
-      // Temporarily remove max-height constraint to measure natural height,
-      // then work out how much vertical space remains for the art.
       $trackInfo.style.maxHeight = '';
-      var swEl0 = $artWrap.parentElement; // #swipeZone
-      var swH   = swEl0.getBoundingClientRect().height;
-      // padding-top:20px is applied in idle CSS on #swipeZone
-      var padTop = 20;
-      var likedBadgeH = 52; // approx height of enlarged tick icon (44px svg + margin)
-      var gapBadgeArt = 8;  // flex gap between elements (clamp lower bound)
-      var gapArtInfo  = 8;  // gap between art and trackInfo (flex gap)
-      // Natural height of trackInfo (big font-size in idle)
-      var infoH = $trackInfo.getBoundingClientRect().height;
-      if (!infoH) infoH = 90; // fallback before first paint
-      var bottomPad = 16; // breathing room at bottom
-      // Max art size that leaves room for badge above + info below
-      var maxByHeight = swH - padTop - likedBadgeH - gapBadgeArt - gapArtInfo - infoH - bottomPad;
-      // Clamp: never below 60px (still recognisable as art), but always
-      // respect the room needed for badge above + title/artist below.
-      size = Math.max(60, Math.min(size, maxByHeight));
+      var padTop = 20;       // padding-top of #swipeZone in idle (CSS)
+      var likedBadgeH = 52;  // approx height of enlarged tick icon (44px svg + margin)
+      var gapBadgeArt = 8, gapArtInfo = 8;
+      var infoH = $trackInfo.offsetHeight || 90; // natural height (big idle font); fallback before first paint
+      var bottomPad = 16;    // breathing room at bottom
+      size = Math.min(size, swH - padTop - likedBadgeH - gapBadgeArt - gapArtInfo - infoH - bottomPad);
     }
+
+    // The tick lives in the space above the cover (the cover is centred in
+    // artWrap). Keep that space tall enough for the tick plus a margin on each
+    // side, so the two can never touch.
+    var badgeH = isIdle ? 44 : 22; // tick icon height (.liked-badge svg, CSS)
+    var BADGE_GAP = 6;
+    var needAbove = badgeH + 2 * BADGE_GAP;
+    size = Math.min(size, wrapH - 2 * Math.max(0, needAbove - wrapTop));
+    size = Math.max(isIdle ? 60 : 40, Math.floor(size));
 
     $art.style.width = size + 'px';
     $art.style.height = size + 'px';
+
+    // Where the cover ends up inside #swipeZone (it is centred inside artWrap).
+    var artLeft   = Math.round(wrapLeft + (wrapW - size) / 2);
+    var artRight  = artLeft + size;
+    var artTop    = Math.round(wrapTop  + (wrapH - size) / 2);
+    var artBottom = artTop + size;
+
     // The idle-mode volume reveal zone is a strip against the window's right
     // edge, sized from the free space beside the art — recompute it here too, since this is
     // the one place art's size is known to have just changed (idle
     // entry/exit, resize, zoom, tab switches all already call this).
     var idleZone = document.getElementById('idleVolumeZone');
     if (idleZone) {
-      // idleVolumeZone is position:absolute inside #swipeZone.
-      // Use offset* properties — already in swipeZone's local coordinate space,
-      // unaffected by CSS transforms on swipeZone.
-      var swEl2       = $artWrap.parentElement; // #swipeZone
-      var artWrapLeft = $artWrap.offsetLeft;
-      var artWrapTop  = $artWrap.offsetTop;
-      var artWrapW    = $artWrap.offsetWidth;
-      var artWrapH    = $artWrap.offsetHeight;
-      // Art is centred inside artWrap.
-      var artLeft     = Math.round(artWrapLeft + (artWrapW - size) / 2);
-      var artRight    = artLeft + size;
-      var artTop      = Math.round(artWrapTop  + (artWrapH - size) / 2);
-      var artBottom   = artTop + size;
-
       // Zone layout (matches reference image):
       // Orange = right of cover, top of window → bottom of cover (no overlap with yellow).
       // Yellow = full width, below the cover → bottom of window (handled by swipe handler).
@@ -1367,64 +1494,78 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       idleZone.style.right  = '0';
       idleZone.style.width  = '';
       idleZone.style.top    = '0';
-      idleZone.style.bottom = (swEl2.offsetHeight - artBottom) + 'px';
+      idleZone.style.bottom = (swH - artBottom) + 'px';
       // Centrer le track de volume horizontalement dans la bande droite (artRight → bord droit)
       var volBar = document.getElementById('idleVolBar');
       if (volBar) {
-        var stripW  = swEl2.offsetWidth - artRight; // largeur de la bande orange
+        var stripW  = swW - artRight; // largeur de la bande orange
         var barW    = volBar.offsetWidth || 5;
-        var centreX = artRight + (stripW / 2); // centre de la bande en px depuis gauche de swipeZone
         volBar.style.right = '';
-        volBar.style.left  = Math.round(centreX - barW / 2) + 'px';
+        volBar.style.left  = Math.round(artRight + stripW / 2 - barW / 2) + 'px';
+      }
+      // Idle: the volume bar's "85%" label hangs 36px under the bar (which ends
+      // at 85% of the height). If the title block reaches down to it, keep the
+      // title narrow enough not to run under the label.
+      var infoBottom = $trackInfo.offsetTop + $trackInfo.offsetHeight;
+      if (isIdle && infoBottom > swH * 0.85) {
+        var barCentre = artRight + (swW - artRight) / 2;
+        $trackInfo.style.maxWidth = Math.max(120, Math.floor(2 * (barCentre - 48 - swW / 2))) + 'px';
+      } else {
+        $trackInfo.style.maxWidth = '';
       }
     }
-    // Position the liked badge and + button in idle mode.
-    var $lb = document.getElementById('likedBadge');
-    var $addWrap = document.getElementById('addToLibraryWrap');
-    var swEl = $artWrap.parentElement; // #swipeZone
-    var swRect = swEl.getBoundingClientRect();
-    var awRect = $artWrap.getBoundingClientRect();
-    if (isIdle) {
-      // Art top relative to swipeZone:
-      var artTopInSw = awRect.top - swRect.top + (awRect.height - size) / 2;
-      var artBotInSw = artTopInSw + size;
-      // Liked badge: centred in the space above the cover, always visible.
-      // The art has already been shrunk (above) to guarantee enough room.
-      if ($lb) {
-        var badgeH = $lb.getBoundingClientRect().height || 44;
-        var spaceAbove = artTopInSw;
-        var badgeTop = Math.round(Math.max(4, spaceAbove / 2 - badgeH / 2));
-        $lb.style.top = badgeTop + 'px';
-        $lb.style.visibility = ''; // always visible in idle
-      }
-      // + button position is handled by CSS (bottom-right corner); clear any
-      // leftover inline top that a previous JS pass may have set.
-      if ($addWrap) $addWrap.style.top = '';
+
+    // Tick: centred in the space above the cover (nudged 10px down in normal
+    // mode, where that space is mostly padding), but never closer than
+    // BADGE_GAP to the cover.
+    var badgeTop = artTop / 2 - badgeH / 2 + (isIdle ? 0 : 10);
+    badgeTop = Math.max(4, Math.min(badgeTop, artTop - badgeH - BADGE_GAP));
+    $likedBadge.style.top = Math.round(badgeTop) + 'px';
+    $likedBadge.style.visibility = '';
+    // + button position is handled by CSS; clear any leftover inline top.
+    document.getElementById('addToLibraryWrap').style.top = '';
+
+    _artBox.left = artLeft; _artBox.top = artTop;
+    fitPlaylistBadge();
+  }
+  // Playlist name pill (top-left corner of the player): when the cover
+  // reaches up to its height, stop the pill before the cover's left edge.
+  // Called whenever the cover is refitted or the pill's text/visibility changes.
+  var _artBox = { left: 0, top: 0 }; // cover position inside #swipeZone, from fitArtSquare
+  function fitPlaylistBadge(){
+    if ($playlistBadge.hidden || !$playlistBadge.offsetHeight) return;
+    var pillBottom = $playlistBadge.offsetTop + $playlistBadge.offsetHeight;
+    if (_artBox.top + $swipeZone.offsetTop < pillBottom + 6) {
+      var room = $swipeZone.offsetLeft + _artBox.left - $playlistBadge.offsetLeft - 10;
+      $playlistBadge.style.maxWidth = Math.max(48, room) + 'px';
     } else {
-      // Normal player: liked badge above the cover art, vertically centred
-      // in the space between the top of swipeZone and the top of the art.
-      if ($lb) {
-        var artTopInSwNormal = awRect.top - swRect.top + (awRect.height - size) / 2;
-        var badgeHNormal = 22;
-        var spaceAboveNormal = artTopInSwNormal;
-        var badgeTopNormal = Math.round(Math.max(4, spaceAboveNormal / 2 - badgeHNormal / 2 + 10));
-        $lb.style.top = badgeTopNormal + 'px';
-      }
-      if ($addWrap) $addWrap.style.top = '';
+      $playlistBadge.style.maxWidth = '';
     }
   }
-  window.addEventListener('resize', fitArtSquare);
-  // Redimensionner le canvas quand la fenêtre change de taille
-  window.addEventListener('resize', function(){
-    if (!_bgRafId) return; // canvas inactif, pas besoin
-    var rect = $npBackground.getBoundingClientRect();
-    $npBgCanvas.width  = rect.width  || 400;
-    $npBgCanvas.height = rect.height || 600;
-    // Réinitialiser les spotlights pour le nouveau format
-    if (_bgColors.length) updateBgSpotlights(_bgColors);
-  });
+  // Window resized, or zoom changed (Ctrl +/-/wheel also changes the CSS size
+  // of the window): rescale the interface, refit the cover, resize the background.
+  function onViewportChange(){
+    applyUiScale();
+    fitArtSquare();
+    refreshBg(false);
+  }
+  window.addEventListener('resize', onViewportChange);
+  // The room left for the cover also changes without any window resize: while
+  // the idle morph plays, when the web fonts finish loading, when a longer
+  // title arrives... Refit once that room has stopped changing (debounced, so
+  // the cover is not re-targeted on every frame of an animation).
+  if (window.ResizeObserver){
+    var refitDebounce = null;
+    var artRoomObserver = new ResizeObserver(function(){
+      clearTimeout(refitDebounce);
+      refitDebounce = setTimeout(fitArtSquare, 80);
+    });
+    artRoomObserver.observe($artWrap);
+    artRoomObserver.observe($trackInfo);
+  }
 
   function play(){
+    if (localMode){ local.play(); return; }
     if (useRealPlayback){
       if (playSavedTrack()) return; // reopened with nothing loaded: resume last music
       // Shown immediately rather than waiting for the next ~2s poll —
@@ -1468,6 +1609,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function pause(){
+    if (localMode){ local.pause(); return; }
     if (useRealPlayback){
       state.playing = false;
       lastPlayChangeAt = Date.now();
@@ -1513,6 +1655,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function next(auto, skipShake){
+    if (localMode){ local.next(); return; }
     if (useRealPlayback){
       optimisticSwitch(queueItems.shift());
       spotifyApi('/me/player/next', { method: 'POST' }).then(pollSoon).catch(function(err){ showToast(friendlySpotifyError(err)); }); return; }
@@ -1526,6 +1669,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     renderLibraryPlayingState();
   }
   function prev(skipShake){
+    if (localMode){ local.prev(); return; }
     if (useRealPlayback){
       // A swipe/press on "previous" means the previous TRACK. Spotify's own
       // rule is "restart the current track if more than ~3 s have played",
@@ -1559,6 +1703,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function toggleShuffle(){
+    if (localMode){ local.toggleShuffle(); return; }
     if (useRealPlayback){
       var next = !$shuffleBtn.classList.contains('on');
       // Set this button's own state right away and leave repeat alone —
@@ -1577,6 +1722,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     $shuffleBtn.classList.toggle('on', state.shuffle);
   }
   function toggleRepeat(){
+    if (localMode){ local.toggleRepeat(); return; }
     if (useRealPlayback){
       var isOn = $repeatBtn.classList.contains('on');
       var newState = isOn ? 'off' : 'track';
@@ -1617,6 +1763,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
     }
     function previewSeek(pct){
+      if (localMode){ local.previewSeek(pct); return; }
       // Visual-only while dragging: moves the fill/time immediately so
       // the finger feels like it's actually dragging something, without
       // spamming the Spotify API on every pixel of movement.
@@ -1631,6 +1778,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       updateProgress();
     }
     function commitSeek(pct){
+      if (localMode){ local.seek(pct); return; }
       if (useRealPlayback){
         if (!realPlaybackMeta.durationMs) return;
         var positionMs = Math.round(pct * realPlaybackMeta.durationMs);
@@ -1684,7 +1832,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       startX = e.clientX; startY = e.clientY;
       // Position Y relative à swipeZone, pour restreindre le exit-idle à la zone jaune
       var zoneRect = zone.getBoundingClientRect();
-      startYInZone = e.clientY - zoneRect.top;
+      startYInZone = (e.clientY - zoneRect.top) / uiScale; // layout px, like _idleArtBottom
       try { zone.setPointerCapture(pid); } catch(err){}
       noTransition();
     }
@@ -1708,11 +1856,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }
       if (locked !== 'x') return;
       noTransition();
-      $art.style.transform = 'translateX(' + dx + 'px)';
+      $art.style.transform = 'translateX(' + (dx / uiScale) + 'px)'; // follow the finger 1:1 on screen
       $art.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 520));
     }
     function finishSwipe(direction){
-      var w = $art.getBoundingClientRect().width;
+      var w = $art.offsetWidth;
       var out = direction === 'next' ? -(w * 0.9 + 60) : (w * 0.9 + 60);
       $art.style.transition = 'transform .26s cubic-bezier(.3,.5,.3,1), opacity .26s ease';
       $art.style.transform = 'translateX(' + out + 'px)';
@@ -1813,10 +1961,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       if (!isIdle()) return;
       scheduleHide();
     };
-    scheduleIdleVolumeHide = function(){
-      if (!isIdle()) return;
-      scheduleHide();
-    };
 
     zone.addEventListener('pointerdown', function(e){
       if (!isIdle()) return;
@@ -1908,10 +2052,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // that needs a quick, non-blocking status message (e.g. shuffle/repeat
   // failures below).
   var $toast = document.getElementById('toast');
+  // Direct child of #app: messages raised from Library / Search / Settings
+  // were invisible while the toast lived inside the (hidden) player view.
+  $app.appendChild($toast);
   var toastTimer = null;
   function showToast(msg){
     if (!msg) return; // callers pass '' when a dialog already explained the problem
     $toast.textContent = msg;
+    // Just above the tab bar — and above the "Back to Player" button in Settings.
+    var exitWrap = document.getElementById('settingsExitWrap');
+    $toast.style.bottom = (document.getElementById('tabbar').offsetHeight + (exitWrap.offsetParent ? exitWrap.offsetHeight : 0) + 12) + 'px';
     $toast.hidden = false;
     requestAnimationFrame(function(){ $toast.classList.add('show'); });
     if (toastTimer) clearTimeout(toastTimer);
@@ -1925,16 +2075,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   (function(){
     var addBtn = document.getElementById('addBtn');
     var menu = document.getElementById('addMenu');
-    // Backdrop and menu both live on document.body so position:fixed/absolute
-    // always covers the full viewport — never clipped by a parent with
-    // transform, display:none or overflow:hidden.
+    // Backdrop and menu are direct children of #app: they cover the whole
+    // window (never clipped by a view that is display:none or by the animated
+    // #swipeZone), and they are scaled together with the rest of the interface.
     var backdrop = document.createElement('div');
     backdrop.id = 'addBackdrop';
     backdrop.hidden = true;
-    document.body.appendChild(backdrop);
-    // Move the menu to body too (was inside #addToLibraryWrap which can be
-    // display:none in idle and has an animated transform ancestor).
-    document.body.appendChild(menu);
+    $app.appendChild(backdrop);
+    $app.appendChild(menu);
 
     function closeMenu(){
       menu.hidden = true;
@@ -1947,19 +2095,26 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // helpers below) so the Library tab and this menu reuse one cache
     // instead of each fetching the playlist list separately.
 
+    // Adds the current track to one of the user's playlists (Spotify Web API,
+    // "Add Items to Playlist": POST /playlists/{id}/items — the older
+    // /tracks path was removed by Spotify in March 2026).
+    function postTrackToPlaylist(pl, trackUri, trackId){
+      return spotifyApi('/playlists/' + pl.id + '/items', {
+        method: 'POST',
+        body: JSON.stringify({ uris: [trackUri] })
+      }).then(function(res){
+        notePlaylistGained(pl, trackId, res && res.snapshot_id);
+        if (realPlaybackMeta.trackId === trackId) paintRealTick(trackId);
+        showToast('Added to “' + pl.name + '”');
+      });
+    }
     function addTrackToRealPlaylist(pl){
       closeMenu();
       var trackUri = realPlaybackMeta.trackUri, trackId = realPlaybackMeta.trackId;
       if (!trackUri){ showToast('Nothing playing'); return; }
-      spotifyApi('/playlists/' + pl.id + '/tracks', {
-        method: 'POST',
-        body: JSON.stringify({ uris: [trackUri] })
-      }).then(function(){
-        addedPlaylistSet.add(trackId);
-        myPlaylistTracksSet.add(trackId); // persist across track changes this session
-        if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
-        showToast('Ajouté à "' + pl.name + '"');
-      }).catch(function(err){
+      // Spotify happily stores the same track twice in a playlist: don't.
+      if (playlistHasTrack(pl.id, trackId)){ showToast('Already in “' + pl.name + '”'); return; }
+      postTrackToPlaylist(pl, trackUri, trackId).catch(function(err){
         if (err && err.status === 403 && window.simplePlayer && window.simplePlayer.spotifyConnect) {
           // Token is missing the playlist-modify scope — show a dialog that
           // triggers reconnect (which re-requests all scopes) then retries.
@@ -1973,44 +2128,48 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             'Ton navigateur va s\'ouvrir — connecte-toi, puis reviens ici.</p>' +
             '<div class="dlg-actions"><button class="later">Plus tard</button>' +
             '<button class="primary reconnect">Reconnecter Spotify</button></div>';
-          document.body.appendChild(back);
-          document.body.appendChild(box);
-          function closeDialog(){ back.remove(); box.remove(); }
-          back.addEventListener('click', closeDialog);
+          back.appendChild(box);
+          $app.appendChild(back);
+          function closeDialog(){ back.remove(); }
+          back.addEventListener('click', function(e){ if (e.target === back) closeDialog(); });
           box.querySelector('.later').addEventListener('click', closeDialog);
           box.querySelector('.reconnect').addEventListener('click', function(){
             closeDialog();
             window.simplePlayer.spotifyConnect().then(function(res){
               if (!res.connected){ showToast('Reconnexion échouée — réessaie depuis Settings'); return; }
               // Retry the add now that we have the right scopes
-              spotifyApi('/playlists/' + pl.id + '/tracks', {
-                method: 'POST',
-                body: JSON.stringify({ uris: [trackUri] })
-              }).then(function(){
-                addedPlaylistSet.add(trackId);
-                myPlaylistTracksSet.add(trackId);
-                if (useRealPlayback) updateRealLikedBadge(trackId); else updateLikedBadge();
-                showToast('Ajouté à "' + pl.name + '"');
-              }).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
+              postTrackToPlaylist(pl, trackUri, trackId).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
             });
           });
         } else {
-          showToast('Could not reach Spotify');
+          showToast(friendlySpotifyError(err) || 'Could not add the track');
         }
       });
     }
+    // "Save Items to Library": PUT /me/library?uris=… (replaces PUT /me/tracks).
+    function likeCurrentRealTrack(){
+      var trackId = realPlaybackMeta.trackId, trackUri = realPlaybackMeta.trackUri || ('spotify:track:' + trackId);
+      if (likedKnown[trackId] === true){ showToast('Already in Liked Songs'); return; }
+      spotifyApi('/me/library?uris=' + encodeURIComponent(trackUri), { method: 'PUT' }).then(function(){
+        likedKnown[trackId] = true;
+        if (realPlaybackMeta.trackId === trackId) paintRealTick(trackId);
+        showToast('Added to Liked Songs');
+        refreshLikedSection(); // the Library tab's Liked Songs list gains a row
+      }).catch(function(err){ showToast(friendlySpotifyError(err) || 'Could not add the track'); });
+    }
 
+    var MENU_CHECK = '<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 10 17.5 19 7.5"/></svg>';
     function renderMenuItems(realPls, errorText){
       menu.innerHTML = '';
       var likedItem = document.createElement('button');
       likedItem.className = 'add-menu-item';
       likedItem.innerHTML = '<div class="swatch" style="background:var(--accent-soft);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--accent)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg></div><span>Liked Songs</span>';
+      if (useRealPlayback && likedKnown[realPlaybackMeta.trackId] === true) likedItem.insertAdjacentHTML('beforeend', MENU_CHECK);
       likedItem.addEventListener('click', function(){
         closeMenu();
-        if (useRealPlayback && realPlaybackMeta.trackId){
-          spotifyApi('/me/tracks?ids=' + realPlaybackMeta.trackId, { method: 'PUT' })
-            .then(function(){ realLikedCache = null; updateRealLikedBadge(realPlaybackMeta.trackId); showToast('Added to Liked Songs'); })
-            .catch(function(){ showToast('Could not reach Spotify'); });
+        if (useRealPlayback){
+          if (!realPlaybackMeta.trackId){ showToast('Nothing playing'); return; }
+          likeCurrentRealTrack();
           return;
         }
         var t = currentTrack();
@@ -2032,6 +2191,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           var imgUrl = (pl.images && pl.images[0]) ? pl.images[0].url : '';
           item.innerHTML = '<div class="swatch" style="background-image:' + cssUrl(imgUrl) + ';background-color:var(--bg-elev-2);"></div><span></span>';
           item.querySelector('span').textContent = pl.name;
+          // A tick on the playlists that already hold the current track.
+          if (playlistHasTrack(pl.id, realPlaybackMeta.trackId)) item.insertAdjacentHTML('beforeend', MENU_CHECK);
           item.addEventListener('click', function(){ addTrackToRealPlaylist(pl); });
           menu.appendChild(item);
         });
@@ -2060,6 +2221,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         renderMenuItems(sortPlaylistsLikeRecents(realPlaylistsCache || [])); // show immediately with whatever's cached (or empty)
         fetchRealPlaylists().then(function(pls){ if (!menu.hidden) renderMenuItems(sortPlaylistsLikeRecents(pls)); })
           .catch(function(err){ if (!menu.hidden) renderMenuItems([], friendlySpotifyError(err) || 'Could not load your playlists'); });
+        // Pick up changes made in the Spotify app meanwhile (new playlist,
+        // tracks added there), then redraw the ticks.
+        refreshPlaylistIndex().then(function(){ if (!menu.hidden && realPlaylistsCache) renderMenuItems(sortPlaylistsLikeRecents(realPlaylistsCache)); });
       } else {
         renderMenuItems(null);
       }
@@ -2067,15 +2231,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
     addBtn.addEventListener('click', function(){
       if (!menu.hidden){ closeMenu(); return; }
+      if (localMode){ showToast('Playlists are not available for local files'); return; }
       buildMenu();
-      // Menu is always in document.body; just toggle idle-menu for positioning.
+      // Just toggle idle-menu for positioning.
       var isIdleNow = document.getElementById('app').classList.contains('idle');
       menu.classList.toggle('idle-menu', isIdleNow);
       if (!isIdleNow){
         // In normal mode: anchor the menu above the + button.
+        // Screen px -> layout px of #app (which may be scaled down).
         var btnRect = addBtn.getBoundingClientRect();
+        var appRect = $app.getBoundingClientRect();
         menu.style.position = 'fixed';
-        menu.style.bottom = (window.innerHeight - btnRect.top + 10) + 'px';
+        menu.style.bottom = ((appRect.bottom - btnRect.top) / uiScale + 10) + 'px';
         menu.style.left = '50%';
         menu.style.transform = 'translateX(-50%)';
         menu.style.top = '';
@@ -2093,13 +2260,15 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     backdrop.addEventListener('click', closeMenu);
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
 
-    // In idle mode the liked badge acts as the add-to-playlist trigger
+    // The tick opens the same playlist chooser as the "+" button — in both
+    // modes (in idle mode it is the only one of the two on screen).
     var $lbBtn = document.getElementById('likedBadge');
     if ($lbBtn) {
       $lbBtn.addEventListener('click', function(){
         var isIdleNow = document.getElementById('app').classList.contains('idle');
-        if (!isIdleNow) return; // normal mode: + button handles it
+        if (!isIdleNow){ addBtn.click(); return; } // normal mode: exactly what the + button does
         if (!menu.hidden){ closeMenu(); return; }
+        if (localMode){ showToast('Playlists are not available for local files'); return; }
         buildMenu();
         menu.classList.add('idle-menu');
         menu.style.position = '';
@@ -2120,18 +2289,30 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   var idle = (function(){
     var app = document.getElementById('app');
     var timer = null;
-    function isPlayerActive(){ return document.getElementById('view-player').classList.contains('active'); }
+    function isPlayerActive(){ return isPlayerViewActive(); }
     // Fullscreen idle : passe en plein écran à l'entrée, sort au hover haut ou double-tap
-    var _idleFullscreen = false;
-    var _idleHoverZone = 60; // px depuis le haut pour déclencher la sortie
+    var _idleFullscreen = false; // true seulement si c'est le mode idle qui a mis la fenêtre en plein écran
+    var _idleFsWanted = false;   // idle en cours : le plein écran est souhaité
+    // Bande tout en haut de l'écran qui fait sortir du mode idle au survol.
+    // Volontairement fine (le bord de l'écran) : à 60 px elle recouvrait la
+    // tique, qu'on ne pouvait donc plus atteindre ni toucher en mode idle.
+    var _idleHoverZone = 4;
 
     function enterIdleFullscreen(){
-      if (window.simplePlayer && window.simplePlayer.setFullScreen){
+      var sp = window.simplePlayer;
+      if (!sp || !sp.setFullScreen) return;
+      _idleFsWanted = true;
+      // Si la fenêtre est déjà en plein écran (F11), on n'y touche pas : sinon
+      // la sortie du mode idle la ferait aussi sortir du plein écran choisi.
+      var already = sp.isFullScreen ? sp.isFullScreen() : Promise.resolve(false);
+      already.then(function(isFs){
+        if (isFs || !_idleFsWanted || _idleFullscreen) return;
         _idleFullscreen = true;
-        window.simplePlayer.setFullScreen(true);
-      }
+        sp.setFullScreen(true);
+      }).catch(function(){});
     }
     function exitIdleFullscreen(){
+      _idleFsWanted = false;
       if (_idleFullscreen && window.simplePlayer && window.simplePlayer.setFullScreen){
         _idleFullscreen = false;
         window.simplePlayer.setFullScreen(false);
@@ -2139,28 +2320,40 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }
 
     // Hover en haut de fenêtre → sortir du mode idle fullscreen
-    document.addEventListener('mousemove', function(e){
+    // Vraie souris uniquement : un appui tactile produit lui aussi un
+    // "mousemove" de compatibilité, qui ne doit pas compter comme un survol.
+    document.addEventListener('pointermove', function(e){
+      if (e.pointerType !== 'mouse') return;
       if (_idleFullscreen && e.clientY <= _idleHoverZone){
         exitIdleFullscreen();
         exitIdle();
       }
     }, { passive: true });
 
+    var MORPH_MS = 620; // slightly over --morph-dur (600ms) so layout is settled
+    var animTimer = null, refitTimer = null;
     function triggerIdleAnim(cls){
       app.classList.remove('idle-enter','idle-leave');
       // Force reflow so removing+adding the class triggers the animation fresh
       void app.offsetWidth; // eslint-disable-line no-void
       app.classList.add(cls);
-      setTimeout(function(){ app.classList.remove(cls); }, 380);
+      // Remove the class once the animation (--morph-dur) has fully played;
+      // one timer only, so an older one can't cut a newer animation short.
+      clearTimeout(animTimer);
+      animTimer = setTimeout(function(){ app.classList.remove('idle-enter','idle-leave'); }, MORPH_MS);
     }
-    var MORPH_MS = 620; // slightly over --morph-dur (600ms) so layout is settled
+    function refitNowAndAfterMorph(){
+      fitArtSquare(); // immediate pass for size
+      clearTimeout(refitTimer);
+      refitTimer = setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
+    }
     function clear(){
+      if (timer){ clearTimeout(timer); timer = null; }
       exitIdleFullscreen();
+      if (!app.classList.contains('idle')) return; // nothing to undo
       triggerIdleAnim('idle-leave');
       app.classList.remove('idle');
-      if (timer){ clearTimeout(timer); timer = null; }
-      fitArtSquare(); // immediate pass for size
-      setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
+      refitNowAndAfterMorph();
     }
     function schedule(){
       if (timer) clearTimeout(timer);
@@ -2169,8 +2362,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           triggerIdleAnim('idle-enter');
           app.classList.add('idle');
           enterIdleFullscreen();
-          fitArtSquare(); // immediate pass for size
-          setTimeout(fitArtSquare, MORPH_MS); // final pass once morph is done
+          refitNowAndAfterMorph();
         }
       }, settings.idleDelay);
     }
@@ -2180,7 +2372,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // it has already engaged; only an explicit double-tap on the cover
       // art does that (see the swipe gesture handler below), so a stray
       // mouse move, key press, or scroll doesn't interrupt it.
-      if (!isPlayerActive()){ clear(); return; }
+      // (Outside the player tab there is nothing to do on each mouse move:
+      // clear() only acts if a timer is pending or idle is still engaged.)
+      if (!isPlayerActive()){ if (timer || app.classList.contains('idle')) clear(); return; }
       if (app.classList.contains('idle')) return;
       schedule();
     }
@@ -2188,9 +2382,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Explicit dismissal (double-tap or hover haut). Unlike clear(), this
       // re-arms the timer so immersive mode can re-engage after another idle period.
       exitIdleFullscreen();
-      triggerIdleAnim('idle-leave');
-      app.classList.remove('idle');
-      fitArtSquare();
+      if (app.classList.contains('idle')){
+        triggerIdleAnim('idle-leave');
+        app.classList.remove('idle');
+        refitNowAndAfterMorph();
+      }
       schedule();
     }
     ['pointerdown','pointermove','keydown','wheel'].forEach(function(ev){
@@ -2215,30 +2411,32 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   wirePillGroup('idleDelayGroup', settings.idleDelay, function(v){
     settings.idleDelay = parseInt(v, 10);
+    saveSettings();
     idle.activity();
-  });
-
-  wirePillGroup('volZoneGroup', settings.volZone, function(v){
-    settings.volZone = v;
-    var preset = RAIL_PRESETS[v];
-    document.documentElement.style.setProperty('--rail-w', preset.rail);
-    document.documentElement.style.setProperty('--vol-track-w', preset.track);
   });
 
   function saveSettings(){
     try { localStorage.setItem('sp_settings', JSON.stringify({
       bgEnabled:  settings.bgEnabled,
       bgAnimated: settings.bgAnimated,
-      idleDelay:  settings.idleDelay
+      idleDelay:  settings.idleDelay,
+      volZone:    settings.volZone
     })); } catch(e) {}
   }
+
+  wirePillGroup('volZoneGroup', settings.volZone, function(v){
+    settings.volZone = v;
+    saveSettings();
+    applyRailPreset();
+    onViewportChange(); // a wider rail changes the minimum layout width
+  });
 
   wirePillGroup('bgToggleGroup', settings.bgEnabled ? 'on' : 'off', function(v){
     settings.bgEnabled = (v === 'on');
     saveSettings();
     document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
     // In real-playback mode, use the cached art URL to restore the background.
-    if (useRealPlayback && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
+    if ((useRealPlayback || localMode) && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
     else updateNpBackground();
   });
   document.getElementById('bgAnimSection').style.display = settings.bgEnabled ? '' : 'none';
@@ -2246,9 +2444,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   wirePillGroup('bgAnimGroup', settings.bgAnimated || 'off', function(v){
     settings.bgAnimated = v; // 'off' | 'normal' | 'medium' | 'fast'
     saveSettings();
-    // Redémarre ou stoppe le canvas selon le nouvel état
-    if (useRealPlayback && _lastArtUrl) updateNpBackgroundReal(_lastArtUrl);
-    else applyBgAnimation();
+    // Redémarre ou stoppe l'animation selon le nouvel état (les couleurs ne changent pas)
+    applyBgAnimation();
   });
 
   wirePillGroup('startupGroup', settings.startup ? 'on' : 'off', function(v){
@@ -2345,6 +2542,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // In the real Windows app, read back the actual OS-level setting on
   // launch (it could differ if the user changed it outside Simple Player).
   if (window.simplePlayer) {
+    document.getElementById('startupNote').hidden = true; // preview-only remark
     window.simplePlayer.getLaunchAtStartup().then(function(enabled){
       settings.startup = !!enabled;
       var group = document.getElementById('startupGroup');
@@ -2365,6 +2563,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
       document.getElementById('view-' + tab.dataset.view).classList.add('active');
       if (tab.dataset.view === 'player'){ idle.activity(); fitArtSquare(); } else idle.clear();
+      refreshBg(false); // animate only while the player is on screen
       if (tab.dataset.view !== 'search') setShortcuts(true); // safety: never leave shortcuts off
       // Opening Search puts the cursor straight in the search box.
       if (tab.dataset.view === 'search'){
@@ -2382,6 +2581,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
     document.getElementById('view-settings').classList.add('active');
     idle.clear();
+    refreshBg(false);
   }
   document.getElementById('settingsBtn').addEventListener('click', openSettingsView);
   function goToPlayerTab(){
@@ -2390,6 +2590,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     document.getElementById('view-player').classList.add('active');
     idle.activity();
     fitArtSquare();
+    refreshBg(false);
   }
 
   // ---------------- Bibliothèque ----------------
@@ -2421,6 +2622,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     row.querySelector('.ttl').textContent = t.title;
     row.querySelector('.sub').textContent = t.artist;
     row.addEventListener('click', function(){
+      leaveLocalMode();
       onPlay();
       renderLibraryPlayingState();
       goToPlayerTab();
@@ -2442,22 +2644,31 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     });
   })();
 
+  // The Liked Songs folder of the Library tab (real account). force=true
+  // re-reads it from Spotify (after a track was liked from here).
+  function refreshLikedSection(force){
+    if (!useRealPlayback) return;
+    var likedEl = document.getElementById('likedList');
+    if (force !== false) force = true;
+    if (!realLikedCache) setLikedFolderCount(null);
+    fetchRealLikedTracks(force).then(function(tracks){
+      likedEl.innerHTML = '';
+      setLikedFolderCount(realLikedTotal !== null ? realLikedTotal : tracks.length);
+      if (!tracks.length){ likedEl.innerHTML = '<div class="search-empty">No liked songs yet.</div>'; return; }
+      var uris = tracks.map(function(t){ return t.uri; });
+      tracks.forEach(function(t, i){
+        likedEl.appendChild(trackRow(t, function(){ playRealUris(uris, i); }));
+      });
+      renderLibraryPlayingState();
+    });
+  }
+
   function renderLibrary(){
     var likedEl = document.getElementById('likedList');
     var grid = document.getElementById('playlistGrid');
 
     if (useRealPlayback){
-      setLikedFolderCount(null);
-      fetchRealLikedTracks().then(function(tracks){
-        likedEl.innerHTML = '';
-        setLikedFolderCount(tracks.length);
-        if (!tracks.length){ likedEl.innerHTML = '<div class="search-empty">No liked songs yet.</div>'; return; }
-        var uris = tracks.map(function(t){ return t.uri; });
-        tracks.forEach(function(t, i){
-          likedEl.appendChild(trackRow(t, function(){ playRealUris(uris, i); }));
-        });
-        renderLibraryPlayingState();
-      });
+      refreshLikedSection(false);
 
       grid.classList.add('as-list');
       grid.innerHTML = '<div class="search-empty">Loading…</div>';
@@ -2475,6 +2686,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           row.querySelector('.name').textContent = pl.name;
           row.querySelector('.sub').textContent = 'Playlist' + (owner ? ' · ' + owner : '');
           row.addEventListener('click', function(){
+            leaveLocalMode();
             notePlaylistPlayed(pl.uri);
             playRealContext(pl.uri);
             renderLibraryPlayingState();
@@ -2516,6 +2728,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       card.querySelector('.name').textContent = pl.name;
       card.querySelector('.count').textContent = tracks.length + ' tracks';
       card.addEventListener('click', function(){
+        leaveLocalMode();
         state.queue = tracks.slice();
         state.index = 0;
         renderTrack();
@@ -2528,7 +2741,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     renderLibraryPlayingState();
   }
   function renderLibraryPlayingState(){
-    var curId = useRealPlayback ? realPlaybackMeta.trackId : (currentTrack() && currentTrack().id);
+    var curId = localMode ? local.currentId() : (useRealPlayback ? realPlaybackMeta.trackId : (currentTrack() && currentTrack().id));
     document.querySelectorAll('.track-row').forEach(function(row){
       row.classList.toggle('playing', curId != null && row.dataset.trackId === String(curId));
     });
@@ -2711,6 +2924,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       var err = new Error('Spotify API error ' + res.status + ' on ' + path + (reason ? ' (' + reason + ')' : ''));
       err.status = res.status;
       err.reason = reason;
+      err.path = path;
       // Parse Retry-After so callers can back off for the right duration.
       if (res.status === 429) {
         var ra = parseInt(res.headers.get('Retry-After') || '5', 10);
@@ -2782,14 +2996,14 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       });
     });
     back.appendChild(box);
-    document.body.appendChild(back);
+    $app.appendChild(back);
   }
 
   function friendlySpotifyError(err){
     if (err && err.reauthRequired) {
       return 'Your Spotify connection expired — go to Settings and reconnect.';
     }
-    if (err && (err.reason === 'NO_ACTIVE_DEVICE' || err.status === 404)) {
+    if (err && (err.reason === 'NO_ACTIVE_DEVICE' || (err.status === 404 && /^\/me\/player/.test(err.path || '')))) {
       if (ghostSettings.enabled && window.simplePlayer.ghostNoActiveDevice) {
         window.simplePlayer.ghostNoActiveDevice();
         return 'No active device — starting Spotify for you, try again in a few seconds.';
@@ -2814,10 +3028,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   function startRealProgressTimer(){
-    if (realProgressTimer) clearInterval(realProgressTimer);
+    if (realProgressTimer) return; // already ticking (it re-reads state on every tick)
     var last = performance.now();
     realProgressTimer = setInterval(function(){
-      if (!state.playing) { last = performance.now(); return; }
+      if (!state.playing || localMode) { last = performance.now(); return; }
       var now = performance.now();
       state.elapsed += (now - last) / 1000;
       last = now;
@@ -2836,16 +3050,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     if (playlistNameCache[id]){
       $playlistBadge.textContent = playlistNameCache[id];
       $playlistBadge.hidden = false;
+      fitPlaylistBadge();
       return;
     }
     $playlistBadge.hidden = true;
     spotifyApi('/playlists/' + id + '?fields=name').then(function(data){
-      if (!data) return;
+      if (!data || localMode) return;
       // Re-check tick after async fetch — user may have changed tracks.
       if (!$likedBadge.classList.contains('on')) return;
       playlistNameCache[id] = data.name;
       $playlistBadge.textContent = data.name;
       $playlistBadge.hidden = false;
+      fitPlaylistBadge();
     }).catch(function(){ /* private/collaborative playlist details can 403; badge just stays hidden */ });
   }
 
@@ -2912,62 +3128,141 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     });
   }
 
-  // Set of all track IDs present in at least one of the user's playlists.
-  // Built in background after auth; updated when a track is added this session.
-  var myPlaylistTracksSet = new Set();
-  var playlistTracksLoaded = false;
-  function buildPlaylistTracksSet(){
-    fetchRealPlaylists().then(function(pls){
-      // Fetch tracks for every playlist in parallel (batches of 5 to stay
-      // within Spotify's rate limits without taking too long).
-      var ids = pls.map(function(p){ return p.id; });
-      function fetchBatch(batch){
-        return Promise.all(batch.map(function(id){
-          function loadPage(offset){
-            return spotifyApi('/playlists/' + id + '/tracks?fields=items(track(id))&limit=100&offset=' + offset)
-              .then(function(r){
-                var items = (r && r.items) || [];
-                items.forEach(function(it){ if (it && it.track && it.track.id) myPlaylistTracksSet.add(it.track.id); });
-                if (r && r.next && items.length && offset < 500) return loadPage(offset + 100);
-              }).catch(function(){}); // ignore 403 on private collab playlists
-          }
-          return loadPage(0);
-        }));
-      }
-      var BATCH = 5;
+  // ---------------- Which of my playlists hold which track ----------------
+  // Spotify has no "is this track in one of my playlists?" call, so the
+  // contents of the user's own playlists are read once ("Get Playlist Items",
+  // GET /playlists/{id}/items, 50 per page) and indexed here. The index
+  // drives the tick on the player and the ticks in the "+" menu, and stops
+  // the same track being added twice to a playlist.
+  // It is cached in localStorage with each playlist's snapshot_id (which
+  // Spotify changes whenever the playlist changes): at the next launch only
+  // the playlists that really changed are read again, so the tick is right
+  // from the first second.
+  var playlistItems = {};        // playlistId -> { snap, ids: { trackId: true } }
+  var PLAYLIST_CACHE_KEY = 'simplePlayer.playlistItems.v2';
+  var PLAYLIST_MAX_ITEMS = 10000; // per playlist
+  var playlistIndexBusy = null;   // promise of the refresh in progress
+  var playlistIndexAt = 0;
+  try {
+    var cachedPl = JSON.parse(localStorage.getItem(PLAYLIST_CACHE_KEY) || '{}') || {};
+    Object.keys(cachedPl).forEach(function(id){
+      var e = cachedPl[id];
+      if (!e || !Array.isArray(e.ids)) return;
+      var ids = {};
+      e.ids.forEach(function(t){ ids[t] = true; });
+      playlistItems[id] = { snap: e.snap || '', ids: ids };
+    });
+  } catch (e) { playlistItems = {}; }
+  function savePlaylistIndex(){
+    try {
+      var out = {};
+      Object.keys(playlistItems).forEach(function(id){ out[id] = { snap: playlistItems[id].snap, ids: Object.keys(playlistItems[id].ids) }; });
+      var json = JSON.stringify(out);
+      if (json.length < 3000000) localStorage.setItem(PLAYLIST_CACHE_KEY, json);
+      else localStorage.removeItem(PLAYLIST_CACHE_KEY); // enormous library: just re-read at each launch
+    } catch (e) {}
+  }
+  function playlistHasTrack(playlistId, trackId){
+    var e = playlistItems[playlistId];
+    return !!(e && trackId && e.ids[trackId]);
+  }
+  function trackInMyPlaylists(trackId){
+    if (!trackId) return false;
+    for (var id in playlistItems) if (playlistItems[id].ids[trackId]) return true;
+    return false;
+  }
+  // A track was just added to a playlist from here.
+  function notePlaylistGained(pl, trackId, snapshotId){
+    var e = playlistItems[pl.id] || (playlistItems[pl.id] = { snap: '', ids: {} });
+    e.ids[trackId] = true;
+    if (snapshotId){
+      e.snap = snapshotId;
+      (realPlaylistsCache || []).forEach(function(p){ if (p.id === pl.id) p.snapshot_id = snapshotId; });
+    }
+    savePlaylistIndex();
+  }
+  // All track ids of one playlist. Waits and retries when Spotify says "too
+  // many requests", instead of silently ending up with half a playlist.
+  function loadPlaylistTrackIds(playlistId){
+    var ids = {};
+    function page(offset, retries){
+      return spotifyApi('/playlists/' + playlistId + '/items?fields=next,items(item(id),track(id))&limit=50&offset=' + offset).then(function(r){
+        var items = (r && r.items) || [];
+        items.forEach(function(it){
+          var tr = it && (it.item || it.track); // "track" is the pre-2026 name of the same field
+          if (tr && tr.id) ids[tr.id] = true;
+        });
+        if (r && r.next && items.length && offset + 50 < PLAYLIST_MAX_ITEMS) return page(offset + 50, 0);
+        return ids;
+      }, function(err){
+        if (err && err.status === 429 && retries < 6){
+          return sleep(((err.retryAfter || 5) + 1) * 1000).then(function(){ return page(offset, retries + 1); });
+        }
+        throw err;
+      });
+    }
+    return page(0, 0);
+  }
+  // Brings the index up to date with the account: reads the playlists that
+  // are new or whose snapshot_id changed, forgets the ones that are gone.
+  function refreshPlaylistIndex(){
+    if (playlistIndexBusy) return playlistIndexBusy;
+    if (Date.now() - playlistIndexAt < 30000) return Promise.resolve(); // just done
+    playlistIndexBusy = fetchRealPlaylists(true).then(function(pls){
+      var alive = {};
+      var todo = pls.filter(function(pl){
+        alive[pl.id] = true;
+        var e = playlistItems[pl.id];
+        return !e || !pl.snapshot_id || e.snap !== pl.snapshot_id;
+      });
+      Object.keys(playlistItems).forEach(function(id){ if (!alive[id]) delete playlistItems[id]; });
       var chain = Promise.resolve();
-      for (var i = 0; i < ids.length; i += BATCH){
-        (function(slice){ chain = chain.then(function(){ return fetchBatch(slice); }); })(ids.slice(i, i + BATCH));
-      }
+      todo.forEach(function(pl){
+        chain = chain.then(function(){
+          return loadPlaylistTrackIds(pl.id).then(function(ids){
+            playlistItems[pl.id] = { snap: pl.snapshot_id || '', ids: ids };
+          }, function(){ /* unreadable playlist (e.g. 403): keep what we had */ });
+        });
+      });
       return chain;
     }).then(function(){
-      playlistTracksLoaded = true;
-      // Re-evaluate the current track's tick now that the set is ready.
-      if (realPlaybackMeta.trackId) updateRealLikedBadge(realPlaybackMeta.trackId);
-    }).catch(function(){});
+      playlistIndexAt = Date.now();
+      savePlaylistIndex();
+    }).catch(function(){ /* offline / token problem: the next call tries again */ })
+      .then(function(){
+        playlistIndexBusy = null;
+        // Re-evaluate the current track's tick now that the index is fresh.
+        if (!localMode && realPlaybackMeta.trackId) paintRealTick(realPlaybackMeta.trackId);
+      });
+    return playlistIndexBusy;
   }
 
   var realLikedCache = null;
+  var realLikedTotal = null; // how many liked songs the account has (the list shows the latest 100)
   function fetchRealLikedTracks(force){
     if (realLikedCache && !force) return Promise.resolve(realLikedCache);
     // Liked Songs can run into the thousands; grabbing the first 100
     // (2 pages) keeps this fast and covers the vast majority of use —
     // same trade-off as showing "recently added" first, which is also
     // what Spotify's own apps default to.
+    function tracksOf(items){ return items.map(function(it){ return it && it.track; }).filter(Boolean); }
     return spotifyApi('/me/tracks?limit=50').then(function(page1){
       var items = (page1 && page1.items) || [];
+      realLikedTotal = (page1 && typeof page1.total === 'number') ? page1.total : null;
       if (page1 && page1.next){
         return spotifyApi('/me/tracks?limit=50&offset=50').then(function(page2){
           items = items.concat((page2 && page2.items) || []);
-          realLikedCache = items.map(function(it){ return it.track; }).filter(Boolean);
-          return realLikedCache;
-        }).catch(function(){
-          realLikedCache = items.map(function(it){ return it.track; }).filter(Boolean);
+        }).catch(function(){ /* keep the first page */ }).then(function(){
+          realLikedCache = tracksOf(items);
           return realLikedCache;
         });
       }
-      realLikedCache = items.map(function(it){ return it.track; }).filter(Boolean);
+      realLikedCache = tracksOf(items);
       return realLikedCache;
+    }).then(function(list){
+      // Everything in this list is, by definition, liked.
+      list.forEach(function(t){ if (t.id) likedKnown[t.id] = true; });
+      return list;
     }).catch(function(){ return realLikedCache || []; });
   }
 
@@ -3002,6 +3297,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     row.querySelector('.ttl').textContent = title;
     row.querySelector('.sub').textContent = subtitle;
     row.addEventListener('click', function(){
+      leaveLocalMode();
       playRealContext(uri);
       goToPlayerTab();
     });
@@ -3028,46 +3324,52 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     playPath().then(function(path){ return spotifyApi(path, { method: 'PUT', body: JSON.stringify(body) }); }).catch(function(err){ showToast(friendlySpotifyError(err)); });
   }
 
-  function invalidateLibraryCache(){
-    realLikedCache = null;
-    realPlaylistsCache = null;
-    myPlaylistTracksSet = new Set();
-    playlistTracksLoaded = false;
-    buildPlaylistTracksSet();
+  // ---------------- The tick on the player ----------------
+  // Green when the current track is in Liked Songs or in one of the user's
+  // own playlists. "Liked" comes from Spotify ("Check User's Saved Items",
+  // GET /me/library/contains?uris=…, which replaced /me/tracks/contains);
+  // "in a playlist" comes from the index above.
+  var likedKnown = {}; // trackId -> true / false, as last answered by Spotify
+  function paintRealTick(trackId){
+    var inPlaylist = trackInMyPlaylists(trackId);
+    var liked = likedKnown[trackId] === true;
+    $likedBadge.classList.toggle('on', liked || inPlaylist);
+    $likedBadge.title = inPlaylist ? 'In one of your playlists' : (liked ? 'In Liked Songs' : 'Not in your library');
+    updateRealPlaylistBadge(realPlaybackMeta.contextUri);
   }
-
   function updateRealLikedBadge(trackId){
     if (!trackId) return;
-    // Immediate green if already known (added this session, or set already built).
-    if (addedPlaylistSet.has(trackId) || myPlaylistTracksSet.has(trackId)){
-      $likedBadge.classList.add('on');
-      $likedBadge.title = 'In a playlist';
-      updateRealPlaylistBadge(realPlaybackMeta.contextUri);
-      // Still fire the API call to confirm (handles Liked Songs too).
-    }
-    spotifyApi('/me/tracks/contains?ids=' + trackId).then(function(result){
-      var inPlaylist = myPlaylistTracksSet.has(trackId) || addedPlaylistSet.has(trackId);
-      var liked = !!(result && result[0]) || inPlaylist;
-      $likedBadge.classList.toggle('on', liked);
-      $likedBadge.title = liked ? (inPlaylist ? 'In a playlist' : 'Liked') : 'Not liked';
-      updateRealPlaylistBadge(realPlaybackMeta.contextUri);
-    }).catch(function(){});
+    // Right away, from what is already known — which also clears the previous
+    // track's tick instead of leaving it up until Spotify answers.
+    paintRealTick(trackId);
+    spotifyApi('/me/library/contains?uris=' + encodeURIComponent('spotify:track:' + trackId)).then(function(result){
+      if (!Array.isArray(result)) return;
+      likedKnown[trackId] = !!result[0];
+      if (localMode || realPlaybackMeta.trackId !== trackId) return; // another track is showing now
+      paintRealTick(trackId);
+    }).catch(function(){ /* tick stays on what is known; the next track change asks again */ });
   }
 
   var _lastArtUrl = '';
+  var _bgArtReq = 0; // numéro de la dernière demande de couleurs de pochette
   function updateNpBackgroundReal(artUrl){
     if (artUrl) _lastArtUrl = artUrl;
     if (!settings.bgEnabled || !artUrl){ stopBgCanvas(); return; }
-    if (settings.bgAnimated === 'off'){ stopBgCanvas(); return; }
-    // Charger l'image, extraire les couleurs dominantes, démarrer les blobs
+    // Charger l'image, extraire les couleurs dominantes, puis teinter le fond
+    // (animé, ou image fixe si l'animation est coupée ou la lecture en pause).
+    var req = ++_bgArtReq;
     var img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = function(){
-      var colors = extractColors(img, 6);
+      if (req !== _bgArtReq) return; // une pochette plus récente a été demandée depuis
+      var colors;
+      try { colors = extractColors(img, 6); }
+      catch (e) { colors = ['#1a1234','#0d2240','#1a2040']; } // image illisible (CORS)
       startBgCanvas(colors);
     };
     img.onerror = function(){
-      // Fallback si l'image ne peut pas être lue (CORS, etc.)
+      if (req !== _bgArtReq) return;
+      // Fallback si l'image ne peut pas être chargée
       startBgCanvas(['#1a1234','#0d2240','#1a2040']);
     };
     img.src = artUrl;
@@ -3268,6 +3570,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // Nothing playing anywhere on the account right now.
       state.playing = false;
       setPlayIcon(false);
+      syncBgToPlayState();
       return;
     }
     var t = s.item;
@@ -3294,6 +3597,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       syncBgToPlayState(state.playing);
     }
     renderRealProgress();
+    syncSpotifyVolume(s.device);
     if (Date.now() - lastShuffleChangeAt > REAL_STATE_GRACE_MS) $shuffleBtn.classList.toggle('on', !!s.shuffle_state);
     if (Date.now() - lastRepeatChangeAt > REAL_STATE_GRACE_MS) $repeatBtn.classList.toggle('on', s.repeat_state === 'context' || s.repeat_state === 'track');
     updateRealPlaylistBadge(realPlaybackMeta.contextUri);
@@ -3316,6 +3620,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       // A reply that was requested before a swipe, or that still shows the
       // old track right after one (Spotify takes a moment to update), must
       // not flip the new cover back to the old one.
+      if (localMode) return; // local files are playing: Spotify's state must not repaint the player
       if (startedAt < lastOptimisticAt) return;
       if (Date.now() - lastOptimisticAt < 1500 && s && s.item && currentRealItem && s.item.id !== currentRealItem.id) return;
       renderRealTrack(s);
@@ -3344,7 +3649,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     pollTimer = setInterval(pollPlaybackState, 2000);
     renderLibrary(); // switch Library over from demo data to the real account
     ensureActiveDeviceOrGhost();
-    buildPlaylistTracksSet(); // populate myPlaylistTracksSet in background
+    refreshPlaylistIndex(); // which of my playlists hold which track (for the tick), in background
   }
 
   // ---------------- "Play on this computer only" ----------------
@@ -3412,15 +3717,19 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     }).catch(function(){ /* worst case: the first Play press does the same job */ });
   }
 
-  // ---------------- Volume: Windows master volume ----------------
-  // On Windows the bars set the computer's own volume (so they control what
-  // you actually hear, whichever app plays). Outside Windows / in a preview
-  // they fall back to Spotify's volume for the active device. Requests are
-  // throttled so dragging doesn't flood the helper / Spotify's API.
+  // ---------------- Volume ----------------
+  // Connected to Spotify: the bars set and show the volume of the active
+  // Spotify device. Not connected (Windows only): they set and show the
+  // computer's own master volume. The bar must only ever mirror the volume it
+  // actually controls: mirroring the Windows volume while controlling
+  // Spotify's made the next touch of the bar (or a wheel notch) send that
+  // unrelated Windows level to Spotify, i.e. a sudden jump in loudness.
+  // Requests are debounced so dragging doesn't flood the helper / Spotify's API.
   var windowsVolume = false;
   var volumeTimer = null, volumeTouchedAt = 0;
 
   function sendVolume(vol){
+    if (localMode){ local.setVolume(vol); return; }
     if (useRealPlayback) spotifyApi('/me/player/volume?volume_percent=' + Math.round(vol), { method: 'PUT' }).catch(function(){});
     else if (windowsVolume) window.simplePlayer.volumeSet(Math.round(vol));
   }
@@ -3434,13 +3743,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     volumeTimer = setTimeout(function(){ sendVolume(state.volume); }, debounce);
   };
 
-  // Keep the bar in sync with the real Windows volume (changed by keyboard,
-  // the taskbar, etc.), but never while the user is touching it.
-  // Ignore small transient dips (≤ 4 pts) that Windows Communications Ducking
-  // can cause briefly when a comm app opens an audio session — they would make
-  // the bar jump for a second and snap back, looking like a bug.
+  // Connected: mirror the active Spotify device's volume, read from the
+  // regular playback poll (so a change made from the phone or the Spotify
+  // app shows here too) — but never while the user is touching the bar, nor
+  // right after (Spotify's reply can lag behind the command just sent).
+  function syncSpotifyVolume(device){
+    if (localMode) return; // the bar shows the local player's own volume then
+    if (!device || typeof device.volume_percent !== 'number') return;
+    if (Date.now() - volumeTouchedAt < 4000) return;
+    var v = Math.max(0, Math.min(100, device.volume_percent));
+    if (Math.round(state.volume) === v) return;
+    state.volume = v;
+    if (updateVolumeDisplay) updateVolumeDisplay();
+  }
+
+  // Not connected: keep the bar in sync with the real Windows volume (changed
+  // by keyboard, the taskbar, etc.), but never while the user is touching it.
+  // A change is only accepted once two consecutive readings agree, so a
+  // one-off odd reading can't make the bar jump and snap back.
   var _lastSyncedVolume = -1;
   function syncWindowsVolume(){
+    if (useRealPlayback || localMode) return; // the bar then follows Spotify's volume (see syncSpotifyVolume) or the local player's
     if (!windowsVolume || document.hidden || Date.now() - volumeTouchedAt < 2500) return;
     window.simplePlayer.volumeGet().then(function(v){
       if (v === null || Date.now() - volumeTouchedAt < 2500) return;
@@ -3470,6 +3793,441 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     });
   }
 
+  // ---------------- Local files ----------------
+  // Plays music files stored on this computer (the "Local" tab). main.js finds
+  // the files and reads their tags; playback happens here, with one <audio>
+  // element fed file:// URLs — Chromium decodes MP3, FLAC (any bit depth /
+  // sample rate), WAV, OGG, Opus and M4A/AAC natively. While `localMode` is
+  // on, the player's transport, progress bar and volume are routed here (see
+  // the `if (localMode)` lines in play / pause / next / prev / seek / volume).
+  var local = (function(){
+    var api = (window.simplePlayer && window.simplePlayer.localGetLibrary) ? window.simplePlayer : null;
+    var $list = document.getElementById('localList');
+    var $hint = document.getElementById('localDropHint');
+    var $count = document.getElementById('localCount');
+    var $addFiles = document.getElementById('localAddFilesBtn');
+    var $addFolder = document.getElementById('localAddFolderBtn');
+    var $clear = document.getElementById('localClearBtn');
+    var $stop = document.getElementById('localStopBtn');
+    var $scroller = document.querySelector('#view-local .scroller');
+
+    var tracks = [];   // the list, in display order (artist / album / disc / track)
+    var queue = [];    // what is being played: the list as it was when playback started
+    var order = [];    // play order: indices into queue (shuffled or not)
+    var pos = -1;      // where we are in `order`
+    var shuffle = false, repeat = false;
+    var failures = 0;  // consecutive files that could not be played
+    var showToken = 0; // guards the asynchronous cover of an older track
+    var previewAt = 0; // last time the progress bar was dragged (preview only)
+    var busyNow = false;
+
+    var audio = new Audio();
+    audio.preload = 'auto';
+
+    // The volume bar's level for local files, remembered on its own (it is not
+    // Spotify's volume nor Windows').
+    var VOLUME_KEY = 'simplePlayer.localVolume';
+    var volume = 70;
+    try { var sv = parseFloat(localStorage.getItem(VOLUME_KEY)); if (sv >= 0 && sv <= 100) volume = sv; } catch (e) {}
+    function applyVolume(){
+      // Squared: the ear hears loudness roughly logarithmically, so a linear
+      // slider would do almost everything in its bottom third.
+      var v = Math.max(0, Math.min(100, volume)) / 100;
+      audio.volume = v * v;
+    }
+    applyVolume();
+
+    function cur(){ return pos >= 0 ? queue[order[pos]] : null; }
+    function duration(){
+      if (isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+      var t = cur();
+      return t && t.duration ? t.duration : 0;
+    }
+    function dirOf(p){ var i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')); return i > 0 ? p.slice(0, i) : ''; }
+    function albumKey(t){ return dirOf(t.path) + '|' + t.album; }
+
+    // ---- covers (asked to main.js once per album and per size, then cached)
+    var coverCache = {};
+    function cover(t, size){
+      if (!api) return Promise.resolve(null);
+      var key = size + '|' + albumKey(t);
+      if (!coverCache[key]) coverCache[key] = api.localCover(t.path, size).catch(function(){ return null; });
+      return coverCache[key];
+    }
+
+    // ---- Now Playing display
+    function renderProgress(){
+      var d = duration();
+      $progressFill.style.width = (d ? Math.min(100, audio.currentTime / d * 100) : 0) + '%';
+      $elapsed.textContent = fmt(audio.currentTime || 0);
+      $total.textContent = d ? fmt(d) : '–:––';
+    }
+    function show(t){
+      $title.textContent = t.title;
+      $artist.textContent = t.artist;
+      state.elapsed = 0;
+      $progressFill.style.width = '0%';
+      $elapsed.textContent = fmt(0);
+      $total.textContent = t.duration ? fmt(t.duration) : '–:––';
+      // Pill in the corner: album and audio quality ("Discovery · FLAC 24-bit / 96 kHz").
+      var pill = [t.album, [t.format, t.quality].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      $playlistBadge.textContent = pill;
+      $playlistBadge.hidden = !pill;
+      fitPlaylistBadge();
+      $likedBadge.classList.remove('on');
+      $likedBadge.title = 'Local file';
+      // A generated cover right away, replaced by the real one when it arrives.
+      var seed = 'local:' + albumKey(t);
+      $art.style.backgroundImage = cssUrl(makeArt(seed));
+      bgFromSeed(seed);
+      var token = ++showToken;
+      cover(t, 'full').then(function(url){
+        if (!url || token !== showToken || !localMode) return;
+        $art.style.backgroundImage = cssUrl(url);
+        updateNpBackgroundReal(url);
+      });
+      if (navigator.mediaSession && window.MediaMetadata){
+        try { navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, album: t.album || '' }); } catch (e) {}
+      }
+      renderLibraryPlayingState();
+    }
+
+    // ---- playback
+    function load(autoplay){
+      var t = cur();
+      if (!t) return;
+      audio.loop = repeat;
+      audio.src = t.url;
+      show(t);
+      if (autoplay) play();
+      else { state.playing = false; setPlayIcon(false); syncBgToPlayState(); }
+    }
+    function play(){
+      if (!cur()) return;
+      var p = audio.play();
+      if (p && p.catch) p.catch(function(){ /* a real failure also fires 'error', handled below */ });
+    }
+    function pause(){ audio.pause(); }
+    function next(auto){
+      if (!order.length) return;
+      pos = (pos + 1) % order.length;
+      load(!!auto || state.playing);
+    }
+    function prev(){
+      if (!order.length) return;
+      // Like every player: "previous" first goes back to the start of the track.
+      if (audio.currentTime > 3){ audio.currentTime = 0; renderProgress(); return; }
+      pos = (pos - 1 + order.length) % order.length;
+      load(state.playing);
+    }
+    function buildOrder(startIndex){
+      order = queue.map(function(_, i){ return i; });
+      if (shuffle){
+        for (var i = order.length - 1; i > 0; i--){
+          var j = Math.floor(Math.random() * (i + 1));
+          var tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+        }
+        // The chosen track first, the rest in random order.
+        var at = order.indexOf(startIndex);
+        if (at > 0){ order.splice(at, 1); order.unshift(startIndex); }
+        pos = 0;
+      } else {
+        pos = startIndex;
+      }
+    }
+    function toggleShuffle(){
+      shuffle = !shuffle;
+      $shuffleBtn.classList.toggle('on', shuffle);
+      if (pos >= 0) buildOrder(order[pos]); // keep playing the same track
+    }
+    function toggleRepeat(){
+      repeat = !repeat; // repeats the current track, like the Spotify button here
+      $repeatBtn.classList.toggle('on', repeat);
+      audio.loop = repeat;
+    }
+    function previewSeek(pct){
+      var d = duration();
+      if (!d) return;
+      previewAt = Date.now();
+      $progressFill.style.width = (pct * 100) + '%';
+      $elapsed.textContent = fmt(pct * d);
+    }
+    function seek(pct){
+      var d = duration();
+      if (!d) return;
+      previewAt = 0;
+      try { audio.currentTime = Math.max(0, Math.min(d - 0.05, pct * d)); } catch (e) {}
+      state.elapsed = audio.currentTime;
+      renderProgress();
+    }
+    function setVolume(v){
+      volume = Math.max(0, Math.min(100, v));
+      applyVolume();
+      try { localStorage.setItem(VOLUME_KEY, String(Math.round(volume))); } catch (e) {}
+    }
+
+    audio.addEventListener('timeupdate', function(){
+      if (!localMode) return;
+      state.elapsed = audio.currentTime;
+      if (Date.now() - previewAt > 400) renderProgress(); // not while the bar is being dragged
+    });
+    audio.addEventListener('durationchange', function(){ if (localMode) renderProgress(); });
+    audio.addEventListener('play', function(){
+      if (!localMode) return;
+      state.playing = true; setPlayIcon(true); syncBgToPlayState();
+    });
+    audio.addEventListener('playing', function(){ failures = 0; });
+    audio.addEventListener('pause', function(){
+      if (!localMode || audio.ended) return; // 'ended' moves on to the next track
+      state.playing = false; setPlayIcon(false); syncBgToPlayState();
+    });
+    audio.addEventListener('ended', function(){ if (localMode) next(true); });
+    audio.addEventListener('error', function(){
+      if (!localMode) return;
+      var t = cur();
+      if (t){
+        t.missing = true;
+        var row = rowFor(t);
+        if (row) row.classList.add('missing');
+        showToast('Cannot play “' + t.title + '” (file moved, deleted or unreadable)');
+      }
+      failures++;
+      // Skip to the next one, but give up after a few in a row (e.g. the
+      // external drive holding the music is unplugged).
+      if (failures < Math.min(order.length, 5)) next(true);
+      else { state.playing = false; setPlayIcon(false); syncBgToPlayState(); }
+    });
+
+    // ---- entering / leaving local mode
+    function enter(){
+      if (localMode) return;
+      // Silence whatever was playing before.
+      if (useRealPlayback){
+        if (state.playing) spotifyApi('/me/player/pause', { method: 'PUT' }).catch(function(){});
+      } else if (state.timer){
+        clearInterval(state.timer); state.timer = null;
+      }
+      state.playing = false;
+      localMode = true;
+      state.volume = volume;
+      if (updateVolumeDisplay) updateVolumeDisplay();
+      $shuffleBtn.classList.toggle('on', shuffle);
+      $repeatBtn.classList.toggle('on', repeat);
+      $stop.hidden = false;
+      if (navigator.mediaSession){
+        try {
+          navigator.mediaSession.setActionHandler('nexttrack', function(){ next(false); });
+          navigator.mediaSession.setActionHandler('previoustrack', function(){ prev(); });
+        } catch (e) {}
+      }
+    }
+    function exit(){
+      if (!localMode) return;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+      localMode = false;
+      showToken++;
+      pos = -1; queue = []; order = []; failures = 0;
+      state.playing = false;
+      setPlayIcon(false);
+      $stop.hidden = true;
+      $playlistBadge.hidden = true;
+      if (navigator.mediaSession){
+        try {
+          navigator.mediaSession.metadata = null;
+          navigator.mediaSession.setActionHandler('nexttrack', null);
+          navigator.mediaSession.setActionHandler('previoustrack', null);
+        } catch (e) {}
+      }
+      volumeTouchedAt = 0; // let the bar pick up Spotify's / Windows' level again right away
+      if (useRealPlayback){
+        // Back to whatever Spotify has: the next poll repaints everything.
+        lastKnownTrackId = null;
+        lastShuffleChangeAt = 0; lastRepeatChangeAt = 0; lastPlayChangeAt = 0;
+        $title.textContent = '—'; $artist.textContent = '—';
+        $progressFill.style.width = '0%'; $elapsed.textContent = fmt(0); $total.textContent = fmt(0);
+        pollSoon();
+      } else {
+        $shuffleBtn.classList.toggle('on', state.shuffle);
+        $repeatBtn.classList.toggle('on', state.repeat);
+        renderTrack();
+      }
+      syncBgToPlayState();
+      renderLibraryPlayingState();
+    }
+    function playFrom(index){
+      if (!tracks.length) return;
+      enter();
+      queue = tracks.slice();
+      failures = 0;
+      buildOrder(Math.max(0, Math.min(index, queue.length - 1)));
+      load(true);
+    }
+
+    // ---- the list
+    function rowFor(t){
+      var rows = $list.querySelectorAll('.track-row');
+      for (var i = 0; i < rows.length; i++) if (rows[i].dataset.trackId === 'local:' + t.path) return rows[i];
+      return null;
+    }
+    var thumbObserver = window.IntersectionObserver ? new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (!en.isIntersecting) return;
+        thumbObserver.unobserve(en.target);
+        loadThumb(en.target);
+      });
+    }, { root: $scroller, rootMargin: '600px 0px' }) : null;
+    function loadThumb(row){
+      var t = row._track;
+      if (!t) return;
+      cover(t, 'thumb').then(function(url){
+        if (url) row.querySelector('.thumb').style.backgroundImage = cssUrl(url);
+      });
+    }
+    function render(){
+      $list.innerHTML = '';
+      var frag = document.createDocumentFragment();
+      var lastGroup = null, albums = 0;
+      tracks.forEach(function(t, i){
+        var group = t.albumArtist + '\u0000' + t.album;
+        if (group !== lastGroup){
+          lastGroup = group; albums++;
+          frag.appendChild(sectionTitle(t.albumArtist + (t.album ? ' — ' + t.album : '') + (t.year ? ' (' + t.year + ')' : '')));
+        }
+        var row = document.createElement('div');
+        row.className = 'track-row local' + (t.missing ? ' missing' : '');
+        row.dataset.trackId = 'local:' + t.path;
+        row._track = t;
+        row.innerHTML =
+          '<div class="thumb" style="background-color:var(--bg-elev-2);"></div>' +
+          '<div class="meta"><div class="ttl"></div><div class="sub"><span class="who"></span><span class="q"></span></div></div>' +
+          '<div class="dur"></div>';
+        row.querySelector('.ttl').textContent = (t.track ? t.track + '. ' : '') + t.title;
+        row.querySelector('.who').textContent = t.artist;
+        var quality = [t.format, t.quality].filter(Boolean).join(' ');
+        row.querySelector('.q').textContent = quality ? ' · ' + quality : '';
+        row.querySelector('.dur').textContent = t.duration ? fmt(t.duration) : '';
+        row.addEventListener('click', function(){ playFrom(i); goToPlayerTab(); });
+        frag.appendChild(row);
+        if (thumbObserver) thumbObserver.observe(row); else loadThumb(row);
+      });
+      $list.appendChild(frag);
+      $hint.hidden = tracks.length > 0;
+      $clear.hidden = tracks.length === 0;
+      setStatus(tracks.length ? tracks.length + (tracks.length === 1 ? ' track' : ' tracks') + ' · ' + albums + (albums === 1 ? ' album' : ' albums') : '');
+      renderLibraryPlayingState();
+    }
+    function setStatus(text){
+      $count.textContent = text;
+      $count.hidden = !text;
+    }
+
+    // ---- adding files
+    function setBusy(on, text){
+      busyNow = on;
+      $addFiles.disabled = on; $addFolder.disabled = on; $clear.disabled = on;
+      $hint.classList.toggle('busy', on);
+      if (on) setStatus(text || 'Working…');
+    }
+    function applyResult(res){
+      if (!res) return; // picker cancelled
+      tracks = res.tracks || [];
+      coverCache = {};
+      if (res.truncated) showToast('Too many files: only the first 20,000 were added');
+      else if (res.added) showToast('Added ' + res.added + (res.added === 1 ? ' track' : ' tracks'));
+      else if (res.found) showToast('Already in the list');
+      else showToast('No audio file found there');
+    }
+    function run(promise, text){
+      if (busyNow) return;
+      setBusy(true, text);
+      promise.then(applyResult).catch(function(){ showToast('Could not read those files'); })
+        .then(function(){ setBusy(false); render(); });
+    }
+    function addPaths(paths){
+      if (!api){ showToast('Local files only work in the real Windows app'); return; }
+      paths = (paths || []).filter(Boolean);
+      if (!paths.length){ showToast('Nothing to add'); return; }
+      run(api.localAddPaths(paths), 'Scanning…');
+    }
+
+    if (api){
+      $addFiles.addEventListener('click', function(){ run(api.localPickFiles(), 'Choose files…'); });
+      $addFolder.addEventListener('click', function(){ run(api.localPickFolder(), 'Choose a folder…'); });
+      if (api.onLocalProgress) api.onLocalProgress(function(done, total){
+        if (busyNow) setStatus('Reading tags… ' + done + ' / ' + total);
+      });
+      api.localGetLibrary().then(function(list){ tracks = list || []; render(); }).catch(function(){});
+    } else {
+      $addFiles.disabled = true; $addFolder.disabled = true;
+      $hint.textContent = 'Local files only work in the real Windows app — not in this preview.';
+    }
+    $stop.addEventListener('click', function(){ exit(); });
+    // "Clear list" asks for a second press, so a slip of the finger can't wipe the list.
+    var clearArmed = null;
+    $clear.addEventListener('click', function(){
+      if (!clearArmed){
+        $clear.textContent = 'Press again to clear';
+        clearArmed = setTimeout(function(){ clearArmed = null; $clear.textContent = 'Clear list'; }, 3000);
+        return;
+      }
+      clearTimeout(clearArmed); clearArmed = null; $clear.textContent = 'Clear list';
+      exit();
+      (api ? api.localClear() : Promise.resolve()).then(function(){ tracks = []; coverCache = {}; render(); });
+    });
+
+    // ---- drag and drop: files or folders dropped anywhere on the window
+    var $drop = document.createElement('div');
+    $drop.id = 'dropOverlay';
+    $drop.textContent = 'Drop to add to your local files';
+    $drop.hidden = true;
+    $app.appendChild($drop);
+    var dragDepth = 0;
+    function hasFiles(e){
+      var types = e.dataTransfer && e.dataTransfer.types;
+      return !!types && Array.prototype.indexOf.call(types, 'Files') !== -1;
+    }
+    window.addEventListener('dragenter', function(e){
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth++;
+      $drop.hidden = false;
+    });
+    window.addEventListener('dragover', function(e){
+      if (!hasFiles(e)) return;
+      e.preventDefault(); // required for 'drop' to fire
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    window.addEventListener('dragleave', function(e){
+      if (!hasFiles(e)) return;
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (!dragDepth) $drop.hidden = true;
+    });
+    window.addEventListener('drop', function(e){
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth = 0;
+      $drop.hidden = true;
+      var files = e.dataTransfer.files, paths = [];
+      for (var i = 0; i < files.length; i++){
+        var p = api && api.localPathForFile ? api.localPathForFile(files[i]) : '';
+        if (p) paths.push(p);
+      }
+      var tab = document.querySelector('.tab[data-view="local"]');
+      if (tab && !tab.classList.contains('active')) tab.click();
+      addPaths(paths);
+    });
+
+    return {
+      play: play, pause: pause, next: next, prev: prev,
+      toggleShuffle: toggleShuffle, toggleRepeat: toggleRepeat,
+      previewSeek: previewSeek, seek: seek, setVolume: setVolume,
+      exit: exit, addPaths: addPaths,
+      currentId: function(){ var t = cur(); return t ? 'local:' + t.path : null; }
+    };
+  })();
+
   // ---------------- Keyboard shortcuts (real app only) ----------------
   // Sent from src/main.js's before-input-event handler, only while this
   // window has focus — never an OS-wide/global shortcut.
@@ -3497,13 +4255,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         box.style.cssText = 'max-width:380px;width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:18px;padding:28px 24px 20px;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);';
         box.innerHTML =
           '<p style="font-size:20px;font-weight:700;margin:0 0 10px;color:var(--fg)">Mise à jour disponible</p>' +
-          '<p style="color:var(--fg-dim);margin:0 0 24px;font-size:15px;line-height:1.5">La version <strong style="color:var(--fg)">' + version + '</strong> est prête à installer.<br>Simple Player va redémarrer automatiquement.</p>' +
+          '<p style="color:var(--fg-dim);margin:0 0 24px;font-size:15px;line-height:1.5">La version <strong style="color:var(--fg)">' + escHtml(version) + '</strong> est prête à installer.<br>Simple Player va redémarrer automatiquement.</p>' +
           '<div style="display:flex;gap:12px;justify-content:flex-end">' +
             '<button id="updateLaterBtn" style="padding:10px 20px;border-radius:12px;background:var(--bg-elev-2);border:1px solid var(--border);font-size:15px;color:var(--fg);cursor:pointer">Plus tard</button>' +
             '<button id="updateNowBtn" style="padding:10px 24px;border-radius:12px;background:var(--accent);border:none;font-size:15px;font-weight:700;color:#fff;cursor:pointer">Installer maintenant</button>' +
           '</div>';
         overlay.appendChild(box);
-        document.body.appendChild(overlay);
+        $app.appendChild(overlay);
         box.querySelector('#updateNowBtn').addEventListener('click', function(){
           overlay.remove();
           window.simplePlayer.installUpdate();

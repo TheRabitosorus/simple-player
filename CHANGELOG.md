@@ -2,6 +2,94 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.2 — 14 novembre 2026
+
+**Choix de la playlist au moment de l'ajout — vérifié, et deux défauts corrigés**
+- **La tique ouvre maintenant la liste des playlists dans les deux modes.** Avant, elle ne réagissait qu'en mode idle ; en mode normal seul le « + » ouvrait la liste. Sa zone tactile est un peu élargie (l'icône ne fait que 22 px).
+- **Tique inutilisable en mode idle plein écran (depuis la v1.20.74).** La bande « survol en haut = sortie du mode idle » faisait 60 px de haut et recouvrait la tique : y poser le doigt ou la souris faisait quitter le mode idle au lieu d'ouvrir la liste. La bande est réduite au bord supérieur de l'écran (4 px) et ne réagit plus qu'à une vraie souris (un appui tactile ne compte plus comme un survol).
+- Rappel du fonctionnement, vérifié par test : « + » ou tique → liste « Liked Songs » + toutes les playlists du compte que tu peux modifier (les tiennes et les collaboratives), avec une coche sur celles qui contiennent déjà le titre ; on choisit, le titre est ajouté à celle-là. La liste défile s'il y en a beaucoup ; toucher à côté la ferme sans rien ajouter.
+
+## v1.21.1 — 14 novembre 2026
+
+**Bibliothèque et playlists Spotify — cause trouvée : Spotify a supprimé les routes que l'app utilisait.** Depuis le 9 mars 2026, les applications en « Development Mode » (c'est le cas de Simple Player) n'ont plus accès à plusieurs routes de l'API Web. L'app appelait encore les anciennes, qui échouaient en silence :
+
+| Ce que faisait l'app | Ancienne route (supprimée) | Nouvelle route utilisée |
+|---|---|---|
+| Ajouter un titre à une playlist | `POST /playlists/{id}/tracks` | `POST /playlists/{id}/items` |
+| Lire le contenu de mes playlists (pour la tique) | `GET /playlists/{id}/tracks` (100 par page) | `GET /playlists/{id}/items` (50 par page maximum) |
+| Savoir si un titre est liké | `GET /me/tracks/contains` | `GET /me/library/contains?uris=…` |
+| Ajouter à Liked Songs | `PUT /me/tracks` | `PUT /me/library?uris=…` |
+
+- **Ajout à une playlist** : fonctionne de nouveau ; plus de doublon possible (un 2e appui sur la même playlist affiche « Already in … » au lieu d'ajouter le titre une seconde fois).
+- **Tique** : verte si le titre est dans Liked Songs **ou** dans une de tes playlists. Corrigé aussi : elle gardait l'état du titre *précédent* tant que Spotify n'avait pas répondu ; elle se met maintenant à jour immédiatement au changement de piste.
+- **Playlists entières** : le contenu n'était lu que jusqu'au 600e titre, et un « trop de requêtes » de Spotify laissait une playlist à moitié lue. Tout est lu (jusqu'à 10 000 titres par playlist), avec attente et nouvel essai si Spotify demande de ralentir.
+- **Mémorisé entre deux lancements** : le contenu des playlists est gardé en cache avec leur numéro de version Spotify ; au lancement, seules les playlists modifiées sont relues, donc la tique est juste dès la première seconde. Les changements faits depuis l'app Spotify sont repris à l'ouverture du menu « + ».
+- **Menu « + »** : une coche indique Liked Songs et les playlists qui contiennent déjà le titre en cours.
+- **Onglet Library** : la liste Liked Songs se met à jour après un ajout, et le compteur affiche le vrai total du compte (il plafonnait à 100).
+- Un « 404 » sur une route de bibliothèque n'est plus pris pour « aucun appareil actif » (ce qui lançait Ghost Spotify pour rien).
+
+**Non fait volontairement** : retirer un titre d'une playlist ou de Liked Songs depuis l'app (risque de suppression par un appui accidentel) — à ajouter si tu le veux.
+
+**Limites** : testé avec une API Spotify simulée d'après la documentation officielle de mars 2026, pas sur ton vrai compte (je n'y ai pas accès). Sources : guide de migration et changelog de février 2026 sur developer.spotify.com.
+
+## v1.21.0 — 14 novembre 2026
+
+**Nouveau : lecture des fichiers de ton ordinateur (onglet « Local »)**
+- **Nouvel onglet « Local »** dans la barre du bas, entre Library et la roue des réglages (icône liste de lecture).
+- **Trois façons d'ajouter de la musique** : « Add files… » (sélecteur de fichiers Windows), « Add folder… » (un dossier d'artiste ou d'album, parcouru avec tous ses sous-dossiers), ou **glisser-déposer** des fichiers / un dossier n'importe où sur la fenêtre (un voile « Drop to add… » apparaît, l'onglet Local s'ouvre tout seul). Pas de doublons si on rajoute le même dossier.
+- **Formats** : MP3 (CBR et VBR, tous débits) et FLAC (16 ou 24 bits, 44,1 à 192 kHz), plus WAV, OGG, Opus et M4A/AAC. Le décodage est fait par le moteur audio de Chromium intégré à l'app.
+- **Tags lus** pour MP3 (ID3v2.2/2.3/2.4) et FLAC : titre, artiste, album, n° de piste et de disque, année, pochette intégrée. Sans tag (ou pour les autres formats), le titre / l'album / l'artiste sont déduits des noms de fichier et de dossiers (`Artiste/Album/01 - Titre.mp3`), et la pochette d'un `cover.jpg` / `folder.jpg` posé dans le dossier.
+- **Liste triée** par artiste, album (par année), disque et piste, avec la **qualité affichée** sur chaque ligne (« FLAC 24-bit / 96 kHz », « MP3 320 kbps », « VBR »…) et la durée.
+- **Lecture dans le Player habituel** : pochette, fond teinté aux couleurs de la pochette, barre de progression (clic et glisser), suivant / précédent (swipe, boutons, flèches du clavier), pause (bouton, tap sur la pochette, barre d'espace), shuffle, repeat, enchaînement automatique des pistes, mode idle. La pastille en haut à gauche indique l'album et la qualité.
+- **Volume propre aux fichiers locaux** (mémorisé), réglé par la même barre / la molette.
+- **Cohabitation avec Spotify** : lancer un fichier local met Spotify en pause ; choisir un titre Spotify (ou « Stop local playback ») rend la main à Spotify. Le bouton « + » (ajout à une playlist Spotify) affiche un message en mode local.
+- **Liste mémorisée** entre deux lancements. Un fichier déplacé ou supprimé est signalé, grisé, et la lecture passe au suivant. « Clear list » (deux pressions) vide la liste — sans toucher aux fichiers.
+- Nouveau fichier `src/localMusic.js` (recherche des fichiers + lecture des tags, sans dépendance supplémentaire).
+
+**Testé** dans la vraie application Electron (sous Linux) avec de vrais fichiers : lecture réelle des 11 fichiers de test (MP3 CBR/VBR, FLAC 16/44,1 – 24/96 – 24/192, WAV, OGG, Opus, M4A), seek, fin de piste, shuffle, repeat, volume, fichier manquant, persistance. **Non testé** : sous Windows même ; le glisser-déposer d'un *dossier* depuis l'Explorateur (seul le dépôt d'un fichier a pu être simulé) ; de très grosses bibliothèques (limite fixée à 20 000 fichiers).
+
+**Corrige aussi** : le zip v1.20.76 contenait par erreur une ébauche non fonctionnelle de cet onglet (boutons sans effet).
+
+## v1.20.76 — 14 novembre 2026
+
+Audit complet du code (main, preload, renderer) + tests automatisés de l'interface dans Chromium à plusieurs centaines de tailles de fenêtre, en mode normal et idle.
+
+**Interface — plus aucun chevauchement, à toutes les tailles**
+- **Mise à l'échelle automatique.** L'interface est conçue pour une fenêtre d'au moins 640 × 720 px (CSS). En dessous, les boutons, textes et barres (de taille fixe) ne tenaient plus : pochette réduite à 40 px, boutons shuffle/repeat hors écran, onglets sous la roue des réglages, barre de volume par-dessus la barre de progression… Désormais, sous cette taille, toute l'interface est calculée à sa taille de référence puis réduite d'un bloc pour tenir dans la fenêtre : tout rétrécit ensemble et garde sa place. À 640 × 720 et au-delà, rien ne change.
+- **Tique « liké » qui touchait la pochette** (fenêtres de 450 à 900 px de haut, mode normal et idle) : la pochette laisse maintenant toujours la place à la tique, avec une marge.
+- **Titres longs.** Un titre ou un artiste long traversait toute la fenêtre et passait par-dessus la barre de volume (les « … » prévus ne s'appliquaient jamais). Ils sont maintenant coupés proprement avec « … », en mode normal comme en idle.
+- **Mode idle** : le « 85 % » sous la barre de volume ne sort plus de la fenêtre et ne touche plus le titre sur les fenêtres étroites.
+- **Pastille du nom de playlist** : elle s'arrête avant la pochette quand celle-ci monte jusqu'à elle (nom long).
+- **Fond animé après redimensionnement.** Le canvas gardait son ancienne taille quand la fenêtre changeait (dont le passage en plein écran du mode idle) : le fond ne couvrait plus toute la zone et repassait en basse résolution. Il suit maintenant la fenêtre en permanence, toujours en 2× minimum.
+- **Recalage automatique de la pochette** quand la place disponible change sans redimensionnement (fin du morph idle, chargement des polices, titre plus long).
+- Le menu « + », les dialogues, l'invite de mise à jour et les messages (toast) suivent la même mise à l'échelle et restent entièrement dans la fenêtre.
+
+**Volume**
+- **Cause réelle trouvée pour les sauts de volume.** Connecté à Spotify, la barre *réglait* le volume Spotify mais *affichait* le volume Windows (resynchronisé toutes les 3 s). Au moindre contact (cran de molette, doigt sur le rail ou sur la zone de droite en idle), c'est donc le niveau Windows qui était envoyé à Spotify → saut brutal du son. La barre affiche maintenant le volume qu'elle contrôle : celui de l'appareil Spotify quand on est connecté (lu à chaque poll, donc à jour aussi si on le change depuis le téléphone), celui de Windows sinon.
+- La molette au-dessus du menu « + » fait défiler la liste au lieu de changer le volume.
+
+**Bugs corrigés**
+- **Dialogue « Permission manquante » invisible** (ajout à une playlist refusé par Spotify) : la boîte était créée hors de l'écran, on ne voyait qu'un voile sombre.
+- **Messages invisibles hors de l'onglet Player** (« Position saved », erreurs de recherche…) : le toast vivait dans la vue Player, masquée ailleurs.
+- **Taille plein écran mémorisée par erreur** : quitter l'app en mode idle (plein écran) faisait rouvrir la fenêtre à la taille de l'écran entier.
+- **Idle + F11** : si la fenêtre est déjà en plein écran, la sortie du mode idle ne la sort plus du plein écran.
+- **Background On + animation Off** affichait un fond noir : on retrouve un fond teinté fixe (comme avant le passage au canvas). Idem en pause.
+- **Tique « liké »** : une réponse tardive de Spotify pour l'ancienne piste ne peut plus modifier la tique de la piste en cours ; même protection pour les couleurs du fond.
+- **Réglages non mémorisés** : la largeur de la barre de volume et le délai du mode idle sont maintenant conservés entre deux lancements.
+- **Icône de la zone de notification** : `build/icon.ico` et `build/icon_tray.png` n'étaient pas inclus dans l'application installée (le dossier `build/` n'est pas empaqueté par défaut) ; ils le sont maintenant, avec un repli si l'un manque.
+- Couleur de base du fond mal calculée pour une couleur hexadécimale (même bug que la v1.20.69, un second endroit).
+- Numéro de version échappé dans l'invite de mise à jour ; remarque « not in this preview » masquée dans la vraie app.
+
+**Optimisations**
+- L'animation du fond s'arrête quand l'onglet Player n'est pas affiché, et ne recalcule plus ses couleurs à chaque image (préparées une fois par pochette).
+- Hors de l'onglet Player, chaque mouvement de souris relançait une animation et deux recalculs de mise en page : supprimé.
+- Le minuteur de progression n'est plus recréé à chaque poll (toutes les 2 s).
+- L'animation d'entrée/sortie du mode idle n'est plus coupée avant sa fin (380 ms au lieu de 600).
+
+**Volontairement inchangé** : le réglage Windows « ducking » ajouté en v1.20.75 est conservé, mais son explication d'alors était en partie fausse (le ducking ne modifie pas le volume général que lit la barre) — la cause démontrée est celle décrite ci-dessus.
+
+**Limites** : tout a été testé dans Chromium avec une simulation de l'API Electron et de Spotify ; je n'ai pas pu lancer la vraie application Windows ici (volume Windows, plein écran natif, installeur et icône de la zone de notification restent à vérifier chez toi).
+
 ## v1.20.75 — 27 octobre 2026
 
 - **Volume : plus de baisse aléatoire.** Double fix : (1) au démarrage, l'app désactive le "Communications Ducking" Windows (la feature qui baisse tous les sons quand Teams/Discord/etc. ouvre une session audio) via une clé registre `HKCU` — non-destructif, par utilisateur, réversible. (2) la synchronisation du volume toutes les 3s requiert désormais deux lectures consécutives identiques avant de mettre à jour la barre — les dips transitoires d'une seule poll (ducking résiduel, bruit système) sont filtrés et n'affichent plus de saut visuel.

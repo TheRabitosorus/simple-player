@@ -46,6 +46,9 @@ La vraie connexion à Spotify : ouvre la page de connexion officielle dans ton n
 ### Lecture réelle (dans `src/renderer/index.html`)
 Une fois connecté, Simple Player agit comme une télécommande + afficheur pour ton compte Spotify — exactement comme quand tu ouvres l'app officielle Spotify sur un appareil qui ne fait pas jouer le son lui-même (ton ordi, par exemple, pendant que la musique sort de ton téléphone ou d'une enceinte). Les boutons play/pause/suivant/précédent/volume/shuffle/repeat envoient de vraies commandes à l'appareil actuellement actif (peu importe lequel), et l'app interroge l'état réel de ton compte toutes les 2 secondes pour afficher ce qui joue vraiment, où que ce soit.
 
+### `src/localMusic.js`
+Fichiers de musique de l'ordinateur (onglet « Local ») : parcourt les dossiers ajoutés et lit les tags MP3 (ID3v2) et FLAC, la qualité, la durée et les pochettes. La lecture elle-même est faite par la fenêtre (élément audio de Chromium : MP3, FLAC, WAV, OGG, Opus, M4A/AAC).
+
 ### `src/renderer/index.html`
 Toute l'interface que tu vois et utilises : la pochette d'album, les boutons de lecture, le swipe tactile, la barre de volume, la bibliothèque, la recherche, et les réglages. C'est ce fichier qui gère l'affichage et qui, une fois la connexion Spotify branchée, parlera à ton compte Spotify.
 
@@ -79,3 +82,4 @@ npm run dist
 - ✅ Contrôle réel de ta lecture Spotify, en télécommande : play/pause/suivant/précédent/volume/shuffle/repeat/progression/pochette réelle, synchronisé avec l'état réel de Spotify (fonctionne même si tu changes de piste depuis ton téléphone). Simple Player ne joue pas le son lui-même — il faut qu'un appareil Spotify (téléphone, ordi, enceinte Connect) soit actif quelque part. On a étudié la lecture directe via le Web Playback SDK officiel de Spotify : confirmé non supporté dans Electron par Spotify lui-même (échec du côté DRM). La seule alternative connue (librespot) n'est pas officielle et comporte un risque réel sur le compte — mise de côté pour l'instant.
 - ✅ Bibliothèque (Liked Songs + tes vraies playlists) et recherche branchées sur ton vrai compte Spotify
 - ⏳ **"Ghost Spotify"** (optionnel, activé par défaut depuis la v1.14.3; classique ou Microsoft Store depuis la v1.16.0) : si aucun appareil n'est actif, lance automatiquement le vrai client Spotify (officiel, version installeur classique) en arrière-plan sur ton ordinateur, masqué de la barre des tâches, fermé avec Simple Player. Pas encore testé en conditions réelles.
+- ✅ **Fichiers locaux** (depuis la v1.21.0) : onglet « Local » pour lire les MP3 / FLAC (et WAV, OGG, Opus, M4A) de l'ordinateur — ajout par sélecteur, par dossier ou par glisser-déposer, liste mémorisée.

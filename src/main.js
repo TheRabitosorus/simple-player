@@ -6,6 +6,8 @@ const { spawn, execFile } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const spotifyAuth = require('./spotifyAuth');
+const localMusic = require('./localMusic');
+const { pathToFileURL } = require('url');
 
 // IMPORTANT: pin the app name before anything reads app.getPath('userData').
 // Without this, Electron derives the name (and therefore where settings are
@@ -33,13 +35,7 @@ if (!gotSingleInstanceLock) {
   app.quit();
   return;
 }
-app.on('second-instance', () => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  }
-});
+app.on('second-instance', () => showMainWindow());
 
 const store = new Store({
   defaults: {
@@ -96,6 +92,10 @@ function getIconPath() {
 // call it too, not only the automatic resize/move/close listeners.
 function saveBounds() {
   if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMaximized() || mainWindow.isMinimized()) return;
+  // Full screen (F11, or the immersive mode which switches to it by itself)
+  // is not a size to remember: saving it made the window reopen as large as
+  // the whole screen the next time.
+  if (mainWindow.isFullScreen()) return;
   store.set('windowBounds', mainWindow.getBounds());
 }
 
@@ -138,7 +138,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: true,
+      // Local files: let the next track start by itself (no click needed).
+      autoplayPolicy: 'no-user-gesture-required'
     }
   });
 
@@ -154,6 +156,13 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.webContents.setZoomFactor(store.get('zoomFactor'));
+  // Applied again once the page is really there: a zoom set before the page
+  // has loaded is not guaranteed to stick.
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.setZoomFactor(clampZoom(store.get('zoomFactor')));
+    }
+  });
 
   // Show the app name + version in the real window title, since the
   // in-page title bar no longer shows a visible "Simple Player" label.
@@ -188,9 +197,8 @@ function createWindow() {
   mainWindow.on('maximize', () => store.set('windowMaximized', true));
   mainWindow.on('unmaximize', () => store.set('windowMaximized', false));
 
-  // Minimize goes to the taskbar normally.
-  // Keep running when the window is closed via the X button (only Quit from
-  // the tray menu exits).
+  // Minimize goes to the taskbar normally. Closing the window with the X
+  // button quits the app (see below).
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       // X button = real quit (pause Spotify + kill Ghost), not hide-to-tray.
@@ -240,19 +248,26 @@ function createWindow() {
   });
 }
 
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 function createTray() {
   const trayIconPath = path.join(__dirname, '..', 'build', 'icon_tray.png');
-  const icon = nativeImage.createFromPath(trayIconPath).resize({ width: 32, height: 32 });
+  let icon = nativeImage.createFromPath(trayIconPath);
+  // Fall back to the main icon rather than showing an empty tray slot.
+  if (icon.isEmpty()) icon = nativeImage.createFromPath(getIconPath());
+  if (!icon.isEmpty()) icon = icon.resize({ width: 32, height: 32 });
   tray = new Tray(icon);
   tray.setToolTip('Simple Player');
 
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Afficher Simple Player',
-      click: () => {
-        mainWindow.show();
-        mainWindow.focus();
-      }
+      click: showMainWindow
     },
     { type: 'separator' },
     {
@@ -266,11 +281,11 @@ function createTray() {
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
-    if (mainWindow.isVisible()) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isVisible() && !mainWindow.isMinimized()) {
       mainWindow.hide();
     } else {
-      mainWindow.show();
-      mainWindow.focus();
+      showMainWindow();
     }
   });
 }
@@ -394,14 +409,14 @@ function killGhostSpotifyIfAny() {
   execFile('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], () => {});
 }
 
-// Explicit, manual fallback for the position/size memory above — a
-// tangible "do it now" control in Settings in case the automatic
-// save-on-move/resize ever doesn't fire for some reason.
 ipcMain.handle('update:install', () => {
   quitSignalSent = true; // skip the pause-before-quit dance
   autoUpdater.quitAndInstall();
 });
 
+// Explicit, manual fallback for the position/size memory above — a
+// tangible "do it now" control in Settings in case the automatic
+// save-on-move/resize ever doesn't fire for some reason.
 ipcMain.handle('window:save-position-now', () => {
   saveBounds();
   return true;
@@ -409,6 +424,7 @@ ipcMain.handle('window:save-position-now', () => {
 ipcMain.handle('window:restore-saved-position', () => {
   const bounds = store.get('windowBounds');
   if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
     if (mainWindow.isMaximized()) mainWindow.unmaximize();
     if (isPositionVisible(bounds)) {
       mainWindow.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
@@ -472,7 +488,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
   try {
     if ($line -eq 'get') { [Console]::Out.WriteLine('V ' + [SPAudio]::Get()) }
     elseif ($line -like 'set *') { [SPAudio]::Set([int]$line.Substring(4)) }
-  } catch { [Console]::Out.WriteLine('E ' + $_.Exception.Message) }
+  } catch { if ($line -eq 'get') { [Console]::Out.WriteLine('E ' + $_.Exception.Message) } }
 }
 `;
 
@@ -531,6 +547,94 @@ ipcMain.handle('volume:set', (event, percent) => {
   if (!h) return false;
   h.stdin.write('set ' + Math.min(100, Math.max(0, n)) + '\n');
   return true;
+});
+
+// --- Local music files ---------------------------------------------------------
+// The "Local" tab plays files stored on this computer. This side finds the
+// files (file / folder pickers, or paths dropped on the window), reads their
+// tags (see localMusic.js) and remembers the list between launches in its own
+// settings file. The window plays them itself through file:// URLs.
+const localStore = new Store({ name: 'local-library', defaults: { tracks: [] } });
+
+function localTracksForRenderer() {
+  return localStore.get('tracks').map((t) => Object.assign({}, t, { url: pathToFileURL(t.path).href }));
+}
+
+let localBusy = Promise.resolve(); // one scan at a time, in order
+function addLocalPaths(paths) {
+  const run = async () => {
+    const list = Array.isArray(paths) ? paths.filter((p) => typeof p === 'string' && p) : [];
+    const { files, truncated } = await localMusic.scan(list);
+    const existing = localStore.get('tracks');
+    const known = new Set(existing.map((t) => t.path));
+    const fresh = files.filter((f) => !known.has(f));
+    const added = await localMusic.readTracks(fresh, (done, total) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('local:progress', done, total);
+    });
+    if (added.length) localStore.set('tracks', localMusic.sortTracks(existing.concat(added)));
+    return { tracks: localTracksForRenderer(), found: files.length, added: added.length, truncated };
+  };
+  const result = localBusy.then(run, run);
+  localBusy = result.catch(() => {});
+  return result;
+}
+
+ipcMain.handle('local:get-library', () => localTracksForRenderer());
+ipcMain.handle('local:add-paths', (event, paths) => addLocalPaths(paths));
+ipcMain.handle('local:pick-files', async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Ajouter des fichiers audio',
+    filters: [
+      { name: 'Audio', extensions: localMusic.AUDIO_EXT.map((e) => e.slice(1)) },
+      { name: 'Tous les fichiers', extensions: ['*'] }
+    ],
+    properties: ['openFile', 'multiSelections']
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  return addLocalPaths(res.filePaths);
+});
+ipcMain.handle('local:pick-folder', async () => {
+  const res = await dialog.showOpenDialog(mainWindow, {
+    title: 'Ajouter un dossier de musique',
+    properties: ['openDirectory', 'multiSelections']
+  });
+  if (res.canceled || !res.filePaths.length) return null;
+  return addLocalPaths(res.filePaths);
+});
+ipcMain.handle('local:clear', () => {
+  localStore.set('tracks', []);
+  localCoverCache.clear();
+  return [];
+});
+
+// Cover of a track of the list, as a small JPEG data: URL ('thumb' for the
+// list, 'full' for the Now Playing screen). Embedded covers can weigh several
+// megabytes, so they are always scaled down here before crossing to the window.
+const localCoverCache = new Map(); // "size|folder|album" -> data URL or null
+ipcMain.handle('local:cover', async (event, filePath, size) => {
+  const track = localStore.get('tracks').find((t) => t.path === filePath);
+  if (!track) return null; // only files the user added
+  const full = size === 'full';
+  const key = (full ? 'full|' : 'thumb|') + path.dirname(filePath) + '|' + track.album; // one cover per album folder
+  if (localCoverCache.has(key)) return localCoverCache.get(key);
+  let url = null;
+  try {
+    const cover = await localMusic.readCover(filePath);
+    if (cover) {
+      let img = nativeImage.createFromBuffer(cover.data);
+      if (!img.isEmpty()) {
+        const max = full ? 1000 : 240;
+        const s = img.getSize();
+        if (s.width > max || s.height > max) {
+          img = s.width >= s.height ? img.resize({ width: max, quality: 'best' }) : img.resize({ height: max, quality: 'best' });
+        }
+        url = 'data:image/jpeg;base64,' + img.toJPEG(full ? 90 : 82).toString('base64');
+      }
+    }
+  } catch (err) { url = null; }
+  if (localCoverCache.size > (full ? 400 : 4000)) localCoverCache.clear();
+  localCoverCache.set(key, url);
+  return url;
 });
 
 ipcMain.handle('display:get-zoom-factor', () => store.get('zoomFactor'));
@@ -708,4 +812,4 @@ app.on('before-quit', (event) => {
 
 // Intentionally no 'window-all-closed' handler: registering one (even an
 // empty one) is what stops Electron from quitting when the last window
-// closes, and closing the window only hides it to the tray anyway.
+// closes — and closing the window is meant to quit the app.

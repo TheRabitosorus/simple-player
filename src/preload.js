@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('simplePlayer', {
   // In-window keyboard shortcuts (Space / Left / Right), sent from main.js
@@ -49,5 +49,18 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   installUpdate: () => ipcRenderer.invoke('update:install'),
 
   setFullScreen: (value) => ipcRenderer.invoke('window:set-fullscreen', value),
-  isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen')
+  isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen'),
+
+  // Local music files (see main.js / localMusic.js). The add* calls resolve to
+  // { tracks, found, added, truncated } — or null when a picker was cancelled.
+  localGetLibrary: () => ipcRenderer.invoke('local:get-library'),
+  localPickFiles: () => ipcRenderer.invoke('local:pick-files'),
+  localPickFolder: () => ipcRenderer.invoke('local:pick-folder'),
+  localAddPaths: (paths) => ipcRenderer.invoke('local:add-paths', paths),
+  localClear: () => ipcRenderer.invoke('local:clear'),
+  localCover: (filePath, size) => ipcRenderer.invoke('local:cover', filePath, size),
+  onLocalProgress: (callback) => ipcRenderer.on('local:progress', (event, done, total) => callback(done, total)),
+  // Real path of a file or folder dropped on the window (the page itself
+  // cannot see paths).
+  localPathForFile: (file) => { try { return webUtils.getPathForFile(file) || ''; } catch (err) { return ''; } }
 });
