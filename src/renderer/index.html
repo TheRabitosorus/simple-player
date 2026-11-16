@@ -268,7 +268,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .ctrl{display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--fg);flex:0 0 auto;transition:background .12s,color .12s,transform .08s;}
 .ctrl:active{transform:scale(.92);}
 /* Remove the browser focus ring after a touch/click — keep it for keyboard nav */
-.ctrl:focus:not(:focus-visible){outline:none;background:transparent;}
+.ctrl:focus:not(:focus-visible){outline:none;}
+/* ...and no leftover hover highlight on the button just clicked. Never on the
+   play button nor on an active (.on) shuffle/repeat: this rule is stronger than
+   theirs and used to wipe their green background, leaving a dark icon on a
+   dark screen ("black button") until something else was clicked. */
+.ctrl-prev:focus:not(:focus-visible),.ctrl-next:focus:not(:focus-visible),
+.ctrl-shuffle:not(.on):focus:not(:focus-visible){background:transparent;}
 .ctrl-prev,.ctrl-next{width:74px;height:74px;}
 .ctrl-prev svg,.ctrl-next svg{width:31px;height:31px;}
 .ctrl-play{width:96px;height:96px;background:var(--accent);color:#06130c;}
@@ -501,26 +507,27 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   padding-bottom:max(10px, env(safe-area-inset-bottom,0px));padding-top:8px;
   position:relative;
 }
-/* Five equal slots, centred on the window: an empty one, Search, Player,
-   Library, Local — so Player (the middle slot) stays on the centre line, under
-   the play and "+" buttons, and Local sits between Library and the gear.
-   The gap shrinks on narrow windows so Local always stops 8px short of the
-   gear: 2 slots + 2 gaps + half a slot must fit between the centre line and
-   the gear's left edge (50% - rail/2 - 63px). */
+/* The four tabs (Search, Player, Library, Local) form one group that is always
+   centred on the window, at every size. The gap shrinks on narrow windows so
+   the group still stops 8px short of the gear on the right: half the group
+   (2 tabs + 1.5 gaps) must fit between the centre line and the gear's left
+   edge (50% - rail/2 - 63px). */
 #tabbar .px{
   display:flex;justify-content:center;padding-left:0;padding-right:0;
-  gap:clamp(2px, calc(25 * var(--vw) - var(--rail-w) / 4 - 141px), 70px);
+  gap:clamp(2px, calc(33.33 * var(--vw) - var(--rail-w) / 3 - 160px), 70px);
 }
-.tab,.tab-spacer{width:84px;flex:0 0 84px;}
+.tab{width:84px;flex:0 0 84px;}
 .tabbar-gear{
   position:absolute;top:50%;transform:translateY(-50%);
-  right:calc(var(--rail-w)/2 - 1px + max(0px, env(safe-area-inset-right,0px)));
-  width:64px;height:64px;border-radius:50%;
+  /* A quarter smaller than the tabs' icons (48px button, 36px icon); the
+     +8px keeps its centre where the 64px button had it. */
+  right:calc(var(--rail-w)/2 + 7px + max(0px, env(safe-area-inset-right,0px)));
+  width:48px;height:48px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
   color:var(--fg-faint);transition:background .12s,color .12s,right .25s ease;
 }
 .tabbar-gear:hover{background:var(--bg-elev-2);color:var(--fg);}
-.tabbar-gear svg{width:48px;height:48px;}
+.tabbar-gear svg{width:36px;height:36px;}
 .tab{display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--fg-faint);padding:6px 0;border-radius:14px;}
 .tab svg{width:48px;height:48px;}
 .tab span{font-size:18px;font-weight:700;letter-spacing:.2px;}
@@ -764,7 +771,6 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
   <nav id="tabbar">
     <div class="px">
-      <span class="tab-spacer" aria-hidden="true"></span>
       <button class="tab" data-view="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>Search</span>
@@ -1744,6 +1750,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // immediately after each click so the button shows its correct state at once.
   function forceRepaint(el){
     void el.offsetHeight; // triggers synchronous layout + repaint
+    // Don't keep keyboard focus on a button clicked with the mouse or a finger
+    // (e.detail is 0 for a keyboard "click"): a focused button would also be
+    // pressed by the next Space / Enter key.
+    if (window.event && window.event.detail > 0) el.blur();
   }
 
   document.getElementById('playBtn').addEventListener('click', function(e){ togglePlay(); forceRepaint(e.currentTarget); });

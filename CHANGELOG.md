@@ -2,6 +2,19 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.5 — 16 novembre 2026
+
+- **Bouton Settings (roue) réduit d'un quart** : icône de 48 à 36 px, bouton de 64 à 48 px. Son centre ne bouge pas.
+
+## v1.21.4 — 16 novembre 2026
+
+- **Les 4 onglets du bas (Search / Player / Library / Local) sont toujours centrés** dans la fenêtre, quelle que soit sa taille. Avant, c'était l'onglet Player seul qui était sur l'axe central, donc le groupe paraissait décalé vers la droite. Sur une fenêtre étroite, l'espace entre les onglets se resserre pour que le groupe reste centré sans toucher la roue des réglages.
+
+## v1.21.3 — 15 novembre 2026
+
+- **Boutons shuffle / repeat (et play) noirs après un clic.** Une règle CSS destinée à effacer le surlignage du bouton qu'on vient de cliquer (`.ctrl:focus… background:transparent`) était plus forte que celle qui met le fond vert des boutons actifs. Résultat : juste après le clic, le bouton activé perdait son fond vert et ne gardait que son icône sombre — donc « noir » sur l'écran — jusqu'à ce qu'on clique ailleurs. Le bouton play était touché de la même façon. La règle ne s'applique plus qu'aux boutons inactifs. Ce n'était pas propre au plein écran : le défaut se produisait à toutes les tailles.
+- Un bouton cliqué à la souris ou au doigt ne garde plus le focus clavier (sinon la touche Espace ou Entrée suivante le ré-actionnait).
+
 ## v1.21.2 — 14 novembre 2026
 
 **Choix de la playlist au moment de l'ajout — vérifié, et deux défauts corrigés**
