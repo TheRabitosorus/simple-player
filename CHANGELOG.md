@@ -2,6 +2,10 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.6 — 16 novembre 2026
+
+- **Onglets du bas rapprochés de 20 px** : l'espace entre deux onglets passe de 70 à 50 px (taille de référence, avant zoom). Le bloc reste centré sous le play et le « + ».
+
 ## v1.21.5 — 16 novembre 2026
 
 - **Bouton Settings (roue) réduit d'un quart** : icône de 48 à 36 px, bouton de 64 à 48 px. Son centre ne bouge pas.
