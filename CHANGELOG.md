@@ -2,6 +2,15 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.8 — 17 novembre 2026
+
+- **Mises à jour automatiques réparées** : l'application installée cherche les nouvelles versions dans les *Releases* GitHub, or ton `deploy.bat` ne fait que pousser le code. Ajout de `.github/workflows/release.yml` : à chaque push avec un nouveau numéro de version, GitHub construit l'installateur Windows et publie la Release tout seul. La Release est publiée directement (pas en brouillon, sinon l'app ne la voit pas).
+- **Nom de l'installateur sans espaces** (`Simple-Player-Setup-X.exe`) : les espaces sont remplacés par des points sur GitHub, ce qui casse la mise à jour automatique.
+
+## v1.21.7 — 17 novembre 2026
+
+- **Boutons précédent / suivant / shuffle / repeat au doigt** : sur un PC Windows qui a à la fois un écran tactile et une souris, Chromium considère que « le survol existe » même quand on tape au doigt. Un tap laissait donc le fond de survol (presque noir) collé sur le bouton, et le doigt ne pouvait pas l'enlever. Le survol ne s'applique maintenant que si le dernier pointeur utilisé est la souris ; dès qu'on touche l'écran il est désactivé, et il revient au premier mouvement de souris. Le comportement à la souris ne change pas.
+
 ## v1.21.6 — 16 novembre 2026
 
 - **Onglets du bas rapprochés de 20 px** : l'espace entre deux onglets passe de 70 à 50 px (taille de référence, avant zoom). Le bloc reste centré sous le play et le « + ».

@@ -1,0 +1,50 @@
+# Construit l'installateur Windows et publie une Release GitHub à chaque
+# nouvelle version (celle de package.json). C'est cette Release que lit
+# l'application installée pour proposer la mise à jour.
+name: Release
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lire la version
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: La Release existe déjà ?
+        id: exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.version }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.exists.outputs.found == 'false'
+        with:
+          node-version: 20
+
+      - name: Installer les dépendances
+        if: steps.exists.outputs.found == 'false'
+        run: npm install --no-audit --no-fund
+
+      - name: Construire et publier la Release
+        if: steps.exists.outputs.found == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always

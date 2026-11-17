@@ -71,7 +71,7 @@ npm start
 npm run dist
 ```
 
-Ça produit un fichier `Simple Player-Setup-X.X.X.exe` dans un dossier `dist/`, prêt à installer.
+Ça produit un fichier `Simple-Player-Setup-X.X.X.exe` dans un dossier `dist/`, prêt à installer.
 
 ## État actuel du projet
 

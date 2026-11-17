@@ -283,10 +283,16 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .ctrl-shuffle svg{width:27px;height:27px;}
 /* Hover states only on real pointer devices — never on touch, where :hover
    sticks after a tap and leaves a ghost highlight on the button. */
+/* On a Windows PC with a touch screen AND a mouse, Chromium reports
+   (hover: hover) even for a finger tap, so a tap leaves :hover stuck on the
+   button (dark ghost background that a finger can never clear). The JS below
+   sets html[data-input] to the LAST pointer used; hover styling applies only
+   when it is the mouse. :where() keeps the original specificity. */
 @media (hover: hover) {
-  .ctrl-prev:hover,.ctrl-next:hover{background:var(--bg-elev);}
-  .ctrl-play:hover{filter:brightness(1.08);}
-  .ctrl-shuffle:hover{background:var(--bg-elev);color:var(--fg);}
+  :where(html[data-input="mouse"]) .ctrl-prev:hover,
+  :where(html[data-input="mouse"]) .ctrl-next:hover{background:var(--bg-elev);}
+  :where(html[data-input="mouse"]) .ctrl-play:hover{filter:brightness(1.08);}
+  :where(html[data-input="mouse"]) .ctrl-shuffle:hover{background:var(--bg-elev);color:var(--fg);}
 }
 .ctrl-shuffle.on{color:#06130c;background:var(--accent);}
 
@@ -1745,6 +1751,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   }
 
   // ---------------- Controls ----------------
+  // Last pointer type used (mouse vs finger/pen) — drives the hover CSS above.
+  (function(){
+    var root = document.documentElement;
+    root.setAttribute('data-input', 'mouse');
+    function set(e){
+      var t = (e.pointerType === 'touch' || e.pointerType === 'pen') ? 'touch' : 'mouse';
+      if (root.getAttribute('data-input') !== t) root.setAttribute('data-input', t);
+    }
+    document.addEventListener('pointerdown', set, true);
+    document.addEventListener('pointermove', function(e){ if (e.pointerType === 'mouse') set(e); }, true);
+  })();
+
   // Chromium (Windows) bug: after a button click, :hover/:active CSS states
   // don't repaint until the mouse moves again. Force a style recalculation
   // immediately after each click so the button shows its correct state at once.
