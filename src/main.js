@@ -19,6 +19,10 @@ const { pathToFileURL } = require('url');
 // makes both launch methods always use the same folder.
 app.setName('Simple Player');
 
+// Everything the user sees (including Chromium's own menus) is English,
+// whatever the Windows display language is.
+app.commandLine.appendSwitch('lang', 'en-US');
+
 // Prevent a second copy of the app from ever running at the same time.
 // Closing the window via the X button only hides it to the tray (by
 // design — see the 'close' handler below) rather than quitting, so
@@ -266,12 +270,12 @@ function createTray() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Afficher Simple Player',
+      label: 'Show Simple Player',
       click: showMainWindow
     },
     { type: 'separator' },
     {
-      label: 'Quitter',
+      label: 'Quit',
       click: () => {
         isQuitting = true;
         app.quit();
@@ -583,10 +587,10 @@ ipcMain.handle('local:get-library', () => localTracksForRenderer());
 ipcMain.handle('local:add-paths', (event, paths) => addLocalPaths(paths));
 ipcMain.handle('local:pick-files', async () => {
   const res = await dialog.showOpenDialog(mainWindow, {
-    title: 'Ajouter des fichiers audio',
+    title: 'Add audio files',
     filters: [
       { name: 'Audio', extensions: localMusic.AUDIO_EXT.map((e) => e.slice(1)) },
-      { name: 'Tous les fichiers', extensions: ['*'] }
+      { name: 'All files', extensions: ['*'] }
     ],
     properties: ['openFile', 'multiSelections']
   });
@@ -595,7 +599,7 @@ ipcMain.handle('local:pick-files', async () => {
 });
 ipcMain.handle('local:pick-folder', async () => {
   const res = await dialog.showOpenDialog(mainWindow, {
-    title: 'Ajouter un dossier de musique',
+    title: 'Add a music folder',
     properties: ['openDirectory', 'multiSelections']
   });
   if (res.canceled || !res.filePaths.length) return null;
@@ -691,7 +695,7 @@ ipcMain.handle('ghost:set-enabled', (event, enabled) => {
 });
 ipcMain.handle('ghost:pick-exe', async () => {
   const res = await dialog.showOpenDialog(mainWindow, {
-    title: 'Sélectionne Spotify.exe',
+    title: 'Select Spotify.exe',
     defaultPath: defaultSpotifyExePath(),
     filters: [{ name: 'Spotify', extensions: ['exe'] }],
     properties: ['openFile']

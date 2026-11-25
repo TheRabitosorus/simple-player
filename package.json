@@ -1,6 +1,6 @@
 {
   "name": "simple-player",
-  "version": "1.21.8",
+  "version": "1.21.9",
   "description": "Lecteur Spotify et fichiers locaux (MP3, FLAC) minimaliste pour Windows - gros boutons, tactile, swipe",
   "main": "src/main.js",
   "author": "Julien",
@@ -34,6 +34,8 @@
     },
     "nsis": {
       "oneClick": false,
+      "language": "1033",
+      "multiLanguageInstaller": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,

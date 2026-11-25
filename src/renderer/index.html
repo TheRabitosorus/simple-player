@@ -1447,6 +1447,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // construction, no matter what else on screen changes.
   var $artWrap = document.getElementById('artWrap');
   var $trackInfo = document.getElementById('trackInfo');
+  var COVER_SLIDE_ROOM = 18; // px of guaranteed slide travel each way, immersive mode
   function fitArtSquare(){
     if (!$artWrap.getClientRects().length) return; // hidden (e.g. a different tab is active)
     var isIdle = $app.classList.contains('idle');
@@ -1479,7 +1480,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // side, so the two can never touch.
     var badgeH = isIdle ? 44 : 22; // tick icon height (.liked-badge svg, CSS)
     var BADGE_GAP = 6;
-    var needAbove = badgeH + 2 * BADGE_GAP;
+    // Immersive mode: the cover can be slid up/down to change the volume, so
+    // keep a little free travel above (up to the tick) and below (down to the
+    // title). The tick is centred in the space above, hence the doubling.
+    var needAbove = badgeH + 2 * BADGE_GAP + (isIdle ? 2 * COVER_SLIDE_ROOM : 0);
     size = Math.min(size, wrapH - 2 * Math.max(0, needAbove - wrapTop));
     size = Math.max(isIdle ? 60 : 40, Math.floor(size));
 
@@ -1530,7 +1534,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // Tick: centred in the space above the cover (nudged 10px down in normal
     // mode, where that space is mostly padding), but never closer than
     // BADGE_GAP to the cover.
-    var badgeTop = artTop / 2 - badgeH / 2 + (isIdle ? 0 : 10);
+    // Immersive mode: nudged 10px up, which leaves the cover more room to slide up.
+    var badgeTop = artTop / 2 - badgeH / 2 + (isIdle ? -10 : 10);
     badgeTop = Math.max(4, Math.min(badgeTop, artTop - badgeH - BADGE_GAP));
     $likedBadge.style.top = Math.round(badgeTop) + 'px';
     $likedBadge.style.visibility = '';
@@ -1846,6 +1851,38 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     var startX = 0, startY = 0, startYInZone = 0, dragging = false, locked = null, pid = null;
     var genId = 0; // bumped on every new gesture so a stale "hand back to CSS" timeout can't clobber a newer one
     var downOnArt = false; // did this touch start on the cover?
+    // Immersive mode: dragging the cover up/down changes the volume. The cover
+    // follows the finger with growing resistance and can never reach the tick
+    // above it nor the title below it; on release it glides back to centre.
+    var vg = null; // current volume gesture: { y0, vol0, up, down }
+    var COVER_SLIDE_MAX = 120; // layout px: cap on the travel, even in a tall window
+    var COVER_SLIDE_GAP = 6;   // layout px kept between the cover and the tick/title
+    function coverSlideLimits(){
+      var artTop = _artBox.top, artBottom = _artBox.top + $art.offsetHeight;
+      var tickBottom = $likedBadge.offsetTop + $likedBadge.offsetHeight;
+      var up = artTop - tickBottom - COVER_SLIDE_GAP;
+      var down = $trackInfo.offsetTop - artBottom - COVER_SLIDE_GAP;
+      return { up: Math.max(0, Math.min(COVER_SLIDE_MAX, up)), down: Math.max(0, Math.min(COVER_SLIDE_MAX, down)) };
+    }
+    // tanh: ~1:1 near the start, then ever stiffer, and never past `limit`.
+    function softLimit(raw, limit){
+      if (limit <= 0) return 0;
+      return (raw < 0 ? -1 : 1) * limit * Math.tanh(Math.abs(raw) / limit);
+    }
+    function volumeDrag(e){
+      if (!vg){
+        var lim = coverSlideLimits();
+        vg = { y0: e.clientY, vol0: state.volume, up: lim.up, down: lim.down };
+      }
+      var d = e.clientY - vg.y0; // screen px, + = finger moved down
+      state.volume = Math.max(0, Math.min(100, vg.vol0 - (d / VOLUME_DRAG_PX) * 100));
+      if (updateVolumeDisplay) updateVolumeDisplay();
+      if (onVolumeChange) onVolumeChange(state.volume);
+      if (showIdleVolumeBar) showIdleVolumeBar();       // show the level while dragging
+      if (scheduleIdleVolumeHide) scheduleIdleVolumeHide();
+      var raw = d / uiScale; // layout px
+      $art.style.transform = 'translate3d(0,' + softLimit(raw, raw < 0 ? vg.up : vg.down).toFixed(1) + 'px,0)';
+    }
 
     function noTransition(){ $art.style.transition = 'none'; }
     function releaseToCss(expectedGen, delay){
@@ -1855,6 +1892,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     function onDown(e){
       if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap') || e.target.closest('#likedBadge')) return;
       genId++;
+      vg = null;
       downOnArt = !!e.target.closest('#art');
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
@@ -1879,7 +1917,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           dragging = false; locked = null;
           snapBack();
           idle.exitIdle();
+          return;
         }
+        if (downOnArt && $app.classList.contains('idle')) volumeDrag(e);
         return;
       }
       if (locked !== 'x') return;
@@ -1931,12 +1971,13 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         // makes the browser aim the click at the zone instead of the cover.
         if (downOnArt) togglePlay();
       }
+      if (vg){ vg = null; snapBack(); }
       locked = null;
     }
     zone.addEventListener('pointerdown', onDown);
     zone.addEventListener('pointermove', onMove);
     zone.addEventListener('pointerup', onUp);
-    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; snapBack(); } });
+    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; vg = null; snapBack(); } });
   })();
 
   // ---------------- Volume reveal zone (idle mode) ----------------
@@ -2151,11 +2192,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           var box = document.createElement('div');
           box.id = 'dialogBox';
           box.setAttribute('role', 'dialog');
-          box.innerHTML = '<h4>Permission manquante</h4>' +
-            '<p>Simple Player doit se reconnecter à Spotify pour pouvoir ajouter des morceaux à tes playlists. ' +
-            'Ton navigateur va s\'ouvrir — connecte-toi, puis reviens ici.</p>' +
-            '<div class="dlg-actions"><button class="later">Plus tard</button>' +
-            '<button class="primary reconnect">Reconnecter Spotify</button></div>';
+          box.innerHTML = '<h4>Permission needed</h4>' +
+            '<p>Simple Player needs to reconnect to Spotify to add tracks to your playlists. ' +
+            'Your browser will open — sign in, then come back here.</p>' +
+            '<div class="dlg-actions"><button class="later">Later</button>' +
+            '<button class="primary reconnect">Reconnect Spotify</button></div>';
           back.appendChild(box);
           $app.appendChild(back);
           function closeDialog(){ back.remove(); }
@@ -2164,9 +2205,9 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
           box.querySelector('.reconnect').addEventListener('click', function(){
             closeDialog();
             window.simplePlayer.spotifyConnect().then(function(res){
-              if (!res.connected){ showToast('Reconnexion échouée — réessaie depuis Settings'); return; }
+              if (!res.connected){ showToast('Reconnection failed — try again from Settings'); return; }
               // Retry the add now that we have the right scopes
-              postTrackToPlaylist(pl, trackUri, trackId).catch(function(){ showToast('Impossible d\'ajouter le morceau'); });
+              postTrackToPlaylist(pl, trackUri, trackId).catch(function(){ showToast('Could not add the track'); });
             });
           });
         } else {
@@ -4282,11 +4323,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
         var box = document.createElement('div');
         box.style.cssText = 'max-width:380px;width:100%;background:var(--bg-elev);border:1px solid var(--border);border-radius:18px;padding:28px 24px 20px;box-shadow:0 20px 60px -10px rgba(0,0,0,.8);';
         box.innerHTML =
-          '<p style="font-size:20px;font-weight:700;margin:0 0 10px;color:var(--fg)">Mise à jour disponible</p>' +
-          '<p style="color:var(--fg-dim);margin:0 0 24px;font-size:15px;line-height:1.5">La version <strong style="color:var(--fg)">' + escHtml(version) + '</strong> est prête à installer.<br>Simple Player va redémarrer automatiquement.</p>' +
+          '<p style="font-size:20px;font-weight:700;margin:0 0 10px;color:var(--fg)">Update available</p>' +
+          '<p style="color:var(--fg-dim);margin:0 0 24px;font-size:15px;line-height:1.5">Version <strong style="color:var(--fg)">' + escHtml(version) + '</strong> is ready to install.<br>Simple Player will restart automatically.</p>' +
           '<div style="display:flex;gap:12px;justify-content:flex-end">' +
-            '<button id="updateLaterBtn" style="padding:10px 20px;border-radius:12px;background:var(--bg-elev-2);border:1px solid var(--border);font-size:15px;color:var(--fg);cursor:pointer">Plus tard</button>' +
-            '<button id="updateNowBtn" style="padding:10px 24px;border-radius:12px;background:var(--accent);border:none;font-size:15px;font-weight:700;color:#fff;cursor:pointer">Installer maintenant</button>' +
+            '<button id="updateLaterBtn" style="padding:10px 20px;border-radius:12px;background:var(--bg-elev-2);border:1px solid var(--border);font-size:15px;color:var(--fg);cursor:pointer">Later</button>' +
+            '<button id="updateNowBtn" style="padding:10px 24px;border-radius:12px;background:var(--accent);border:none;font-size:15px;font-weight:700;color:#fff;cursor:pointer">Install now</button>' +
           '</div>';
         overlay.appendChild(box);
         $app.appendChild(overlay);

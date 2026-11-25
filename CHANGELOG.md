@@ -2,6 +2,13 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.9 — 25 novembre 2026
+
+- **Volume en glissant la pochette (mode immersif / plein écran)** : un doigt posé sur la pochette qui monte ou descend change le volume (monter = plus fort). La pochette suit le doigt avec une résistance croissante, sans jamais atteindre la tique au-dessus ni le titre en dessous (6 px de marge au minimum, 120 px de course maximum), puis revient doucement au centre au relâchement. La barre de volume s'affiche pendant le geste. Le tap (pause / lecture), le glissement horizontal (piste suivante / précédente), la bande de volume sur le côté et le balayage vers le haut sous la pochette fonctionnent comme avant. Hors mode immersif, rien ne change.
+- **Un peu de place réservée autour de la pochette en mode immersif** pour que le glissement soit visible : sur les fenêtres peu hautes (par exemple 1366×768), la pochette est environ 14 % plus petite qu'avant, et la tique est remontée de 10 px. Sur les écrans hauts (portrait), aucun changement de taille.
+- **Tous les messages visibles par l'utilisateur sont en anglais** (cette partie, prévue pour la v1.21.9 précédente, n'était jamais arrivée sur GitHub) : menu de la barre des tâches (« Show Simple Player » / « Quit »), fenêtres de choix de fichiers et de dossiers, fenêtre « Update available » (Later / Install now), fenêtre « Permission needed » (reconnexion Spotify), messages d'erreur courts, et page de confirmation de connexion Spotify.
+- **Installateur Windows toujours en anglais**, quelle que soit la langue de Windows (`language: 1033`, installateur multilingue désactivé). Les menus internes de Chromium (clic droit) sont aussi forcés en anglais.
+
 ## v1.21.8 — 17 novembre 2026
 
 - **Mises à jour automatiques réparées** : l'application installée cherche les nouvelles versions dans les *Releases* GitHub, or ton `deploy.bat` ne fait que pousser le code. Ajout de `.github/workflows/release.yml` : à chaque push avec un nouveau numéro de version, GitHub construit l'installateur Windows et publie la Release tout seul. La Release est publiée directement (pas en brouillon, sinon l'app ne la voit pas).

@@ -158,17 +158,17 @@ function startLogin() {
 
         const closePage = (message) => {
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          res.end(`<!doctype html><html><body style="font-family:sans-serif;background:#0b0d0f;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><p>${message}</p></body></html>`);
+          res.end(`<!doctype html><html lang="en"><body style="font-family:sans-serif;background:#0b0d0f;color:#eee;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;"><p>${message}</p></body></html>`);
         };
 
         if (error) {
-          closePage('Connexion annulée. Tu peux fermer cette fenêtre.');
+          closePage('Connection cancelled. You can close this window.');
           server.close();
           reject(new Error(`Spotify returned an error: ${error}`));
           return;
         }
         if (returnedState !== state) {
-          closePage('Erreur de sécurité (state invalide). Tu peux fermer cette fenêtre.');
+          closePage('Security error (invalid state). You can close this window.');
           server.close();
           reject(new Error('State mismatch — possible CSRF attempt, aborting.'));
           return;
@@ -179,11 +179,11 @@ function startLogin() {
         cachedAccessToken = tokens.access_token;
         cachedAccessTokenExpiry = Date.now() + tokens.expires_in * 1000;
 
-        closePage('Connecté à Spotify ! Tu peux fermer cette fenêtre et revenir à Simple Player.');
+        closePage('Connected to Spotify! You can close this window and go back to Simple Player.');
         server.close();
         resolve(true);
       } catch (err) {
-        try { res.writeHead(500).end('Erreur interne.'); } catch {}
+        try { res.writeHead(500).end('Internal error.'); } catch {}
         server.close();
         reject(err);
       }
@@ -200,7 +200,7 @@ function startLogin() {
     // port open forever.
     setTimeout(() => {
       server.close();
-      reject(new Error('Délai de connexion dépassé.'));
+      reject(new Error('Sign-in timed out.'));
     }, 5 * 60 * 1000);
   });
 }
