@@ -223,6 +223,18 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #app.idle #art .art-overlay{transition:opacity .8s ease, background .8s ease;}
 #app.idle #art.flash .art-overlay{opacity:1;background:rgba(0,0,0,.28);transition:opacity .1s ease, background .1s ease;}
 #art .art-overlay svg{width:30%;height:30%;color:var(--accent);filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));}
+/* Immersive mode, dragging the cover sideways: "+0:24" / "-0:12" (jump in the
+   track) or "Next" / "Previous" (past the change-track distance). */
+.seek-hint{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  padding:10px 22px;border-radius:999px;
+  background:rgba(0,0,0,.58);color:#fff;
+  font:inherit;font-weight:600;font-size:30px;line-height:1;font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .12s ease;
+}
+.seek-hint.show{opacity:1;}
+.seek-hint.commit{background:var(--accent);color:#06130c;}
 
 #trackInfo{
   text-align:center;max-width:min(calc(80 * var(--vw)),420px);flex:0 0 auto;
@@ -563,6 +575,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
             <div class="art-overlay" id="artOverlay">
               <svg id="artOverlayIcon" viewBox="0 0 24 24" fill="currentColor"></svg>
             </div>
+            <div class="seek-hint" id="seekHint" aria-hidden="true"></div>
           </div>
         </div>
         <div id="trackInfo">
@@ -1043,6 +1056,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   // Set by the idle-volume block below so the wheel handler can reveal the bar.
   var showIdleVolumeBar = null;
   var scheduleIdleVolumeHide = null;
+  var seekControl = null; // set by the progress-bar module; used by the cover swipe (immersive mode)
 
   // Mouse wheel on the window adjusts volume (5% per notch).
   // Disabled when the Settings, Library or Search view is active so the
@@ -1822,6 +1836,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }
       previewSeek(pct); // demo mode has no server round-trip to wait on
     }
+    // Used by the cover swipe (immersive mode) to scrub through the track.
+    // info(): where we are now + how often it is reasonable to send a seek
+    // (the local <audio> can take one every 200 ms, the Spotify API much fewer).
+    // to(sec): absolute position, same path as dragging the progress bar.
+    seekControl = {
+      info: function(){
+        var d;
+        if (localMode) d = local.duration ? local.duration() : 0;
+        else if (useRealPlayback) d = realPlaybackMeta.durationMs / 1000;
+        else { var t = currentTrack(); d = t ? t.duration : 0; }
+        return { elapsed: state.elapsed || 0, duration: d || 0, everyMs: localMode ? 200 : (useRealPlayback ? 700 : 100) };
+      },
+      to: function(sec){
+        var d = this.info().duration;
+        if (!d) return;
+        commitSeek(Math.max(0, Math.min(d - 1, sec)) / d);
+      }
+    };
     $seekTarget.addEventListener('pointerdown', function(e){
       seekDragging = true;
       try { $seekTarget.setPointerCapture(e.pointerId); } catch(err){}
@@ -1855,6 +1887,62 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     // follows the finger with growing resistance and can never reach the tick
     // above it nor the title below it; on release it glides back to centre.
     var vg = null; // current volume gesture: { y0, vol0, up, down }
+    // Immersive mode, horizontal drag on the cover:
+    //  - past 30% of the cover's width: release changes track (left = next, right = previous);
+    //  - less: the track is SCRUBBED for as long as the cover is held off-centre
+    //    (right = forward, left = back). The speed is proportional to how far
+    //    the cover is pushed, from 0 up to SCRUB_SPEED_AT_CHANGE (seconds of
+    //    track per real second) just before the change-track distance.
+    var CHANGE_TRACK_FRAC = 0.30;
+    var SCRUB_SPEED_AT_CHANGE = 30;
+    var SEEK_DEAD_PX = 12; // layout px: a smaller wiggle does nothing
+    var $seekHint = document.getElementById('seekHint');
+    function swipeInfo(dx){ // dx in screen px
+      var dxL = dx / uiScale, limit = $art.offsetWidth * CHANGE_TRACK_FRAC;
+      if (Math.abs(dxL) > limit) return { mode: 'change', dir: dxL < 0 ? 'next' : 'prev', speed: 0 };
+      if (Math.abs(dxL) < SEEK_DEAD_PX) return { mode: 'none', speed: 0 };
+      var t = (Math.abs(dxL) - SEEK_DEAD_PX) / Math.max(1, limit - SEEK_DEAD_PX); // 0..1
+      return { mode: 'seek', speed: (dxL < 0 ? -1 : 1) * t * SCRUB_SPEED_AT_CHANGE };
+    }
+    // Scrub state for the current gesture (null when the track length is unknown).
+    var scrub = null, scrubTimer = null, curDx = 0;
+    function showHint(info){
+      if (!$seekHint) return;
+      if (info.mode === 'none') { $seekHint.classList.remove('show', 'commit'); return; }
+      $seekHint.textContent = info.mode === 'change'
+        ? (info.dir === 'next' ? 'Next \u203A' : '\u2039 Previous')
+        : (info.seconds < 0 ? '\u2212' : '+') + fmt(Math.abs(info.seconds));
+      $seekHint.classList.toggle('commit', info.mode === 'change');
+      $seekHint.classList.add('show');
+    }
+    function scrubTick(){
+      var now = performance.now();
+      var info = swipeInfo(curDx);
+      if (!scrub){ showHint(info.mode === 'change' ? info : { mode: 'none' }); return; }
+      var dt = Math.min(0.2, (now - scrub.last) / 1000); // a stalled frame must not teleport
+      scrub.last = now;
+      if (info.mode === 'seek') scrub.pos = Math.max(0, Math.min(scrub.dur - 1, scrub.pos + info.speed * dt));
+      var delta = scrub.pos - scrub.pos0;
+      if (info.mode === 'change') showHint(info);
+      else if (info.mode === 'seek' || Math.abs(delta) >= 1) showHint({ mode: 'seek', seconds: delta });
+      else showHint({ mode: 'none' });
+      // Send the new position now and then (not at every frame).
+      if (info.mode === 'seek' && Math.abs(scrub.pos - scrub.sentPos) >= 1 && now - scrub.sentAt >= scrub.everyMs){
+        seekControl.to(scrub.pos); scrub.sentAt = now; scrub.sentPos = scrub.pos;
+      }
+    }
+    function startScrub(){
+      if (scrubTimer) return;
+      var i = seekControl ? seekControl.info() : null;
+      scrub = (i && i.duration) ? { pos0: i.elapsed, pos: i.elapsed, dur: i.duration, last: performance.now(), sentAt: 0, sentPos: i.elapsed, everyMs: i.everyMs } : null;
+      scrubTimer = setInterval(scrubTick, 50);
+    }
+    function stopScrub(commit){
+      if (scrubTimer){ clearInterval(scrubTimer); scrubTimer = null; }
+      if (commit && scrub && Math.abs(scrub.pos - scrub.sentPos) > 0.01) seekControl.to(scrub.pos);
+      scrub = null;
+    }
+    function hideHint(){ if ($seekHint) $seekHint.classList.remove('show', 'commit'); }
     var COVER_SLIDE_MAX = 120; // layout px: cap on the travel, even in a tall window
     var COVER_SLIDE_GAP = 6;   // layout px kept between the cover and the tick/title
     function coverSlideLimits(){
@@ -1893,6 +1981,8 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       if (e.target.closest('#transport') || e.target.closest('#progressWrap') || e.target.closest('#addToLibraryWrap') || e.target.closest('#likedBadge')) return;
       genId++;
       vg = null;
+      stopScrub(false);
+      curDx = 0;
       downOnArt = !!e.target.closest('#art');
       dragging = true; locked = null; pid = e.pointerId;
       startX = e.clientX; startY = e.clientY;
@@ -1926,8 +2016,10 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       noTransition();
       $art.style.transform = 'translateX(' + (dx / uiScale) + 'px)'; // follow the finger 1:1 on screen
       $art.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 520));
+      if ($app.classList.contains('idle')){ curDx = dx; startScrub(); }
     }
     function finishSwipe(direction){
+      hideHint();
       var w = $art.offsetWidth;
       var out = direction === 'next' ? -(w * 0.9 + 60) : (w * 0.9 + 60);
       $art.style.transition = 'transform .26s cubic-bezier(.3,.5,.3,1), opacity .26s ease';
@@ -1952,6 +2044,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       }, 220);
     }
     function snapBack(){
+      hideHint();
       $art.style.transition = 'transform .25s cubic-bezier(.2,.7,.3,1), opacity .25s ease';
       $art.style.transform = 'translateX(0)';
       $art.style.opacity = '1';
@@ -1962,7 +2055,12 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
       dragging = false;
       if (locked === 'x'){
         var dx = e.clientX - startX;
-        if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
+        if ($app.classList.contains('idle')) {
+          var info = swipeInfo(dx);
+          if (info.mode === 'change'){ stopScrub(false); finishSwipe(info.dir); }
+          else { stopScrub(true); snapBack(); }
+        }
+        else if (Math.abs(dx) > 55) finishSwipe(dx < 0 ? 'next' : 'prev');
         else snapBack();
       } else if (locked === null){
         // A tap, not a drag. Tap on the cover toggles play/pause.
@@ -1977,7 +2075,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     zone.addEventListener('pointerdown', onDown);
     zone.addEventListener('pointermove', onMove);
     zone.addEventListener('pointerup', onUp);
-    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; vg = null; snapBack(); } });
+    zone.addEventListener('pointercancel', function(){ if (dragging){ dragging = false; locked = null; vg = null; stopScrub(false); snapBack(); } });
   })();
 
   // ---------------- Volume reveal zone (idle mode) ----------------
@@ -4291,7 +4389,7 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
     return {
       play: play, pause: pause, next: next, prev: prev,
       toggleShuffle: toggleShuffle, toggleRepeat: toggleRepeat,
-      previewSeek: previewSeek, seek: seek, setVolume: setVolume,
+      previewSeek: previewSeek, seek: seek, setVolume: setVolume, duration: duration,
       exit: exit, addPaths: addPaths,
       currentId: function(){ var t = cur(); return t ? 'local:' + t.path : null; }
     };

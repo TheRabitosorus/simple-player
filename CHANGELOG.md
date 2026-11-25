@@ -2,6 +2,18 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.21.11 — 25 novembre 2026
+
+- **Défilement continu dans la piste avec la pochette (mode immersif)** : en dessous de 30 % de la largeur de la pochette, ce n'est plus un saut au relâchement. Tant que tu gardes la pochette décalée, la lecture avance (vers la droite) ou recule (vers la gauche), même si ton doigt ne bouge plus. Plus tu décales la pochette, plus ça va vite : environ 8 s de piste par seconde à 30 % du seuil, 18 s/s à 60 %, jusqu'à 30 s/s juste avant le changement de piste. Au centre (moins de 12 px) rien ne bouge. La pastille affiche le total « +0:24 » / « −0:12 » depuis le début du geste. La position est envoyée régulièrement pendant le geste (toutes les 200 ms en lecture locale, toutes les 700 ms avec Spotify) et une dernière fois au relâchement. Au-delà de 30 %, relâcher change toujours de piste.
+
+## v1.21.10 — 25 novembre 2026
+
+- **Glissement horizontal de la pochette en mode immersif (plein écran)** :
+  - **Plus de 30 % de la largeur de la pochette** (vers la gauche = piste suivante, vers la droite = piste précédente) : la piste change au relâchement, comme avant mais avec ce seuil.
+  - **Moins de 30 %** : la piste ne change pas, on se déplace dedans (saut au relâchement : remplacé par un défilement continu dans la v1.21.11).
+  - Pendant le geste, une pastille sur la pochette indique « +0:24 » / « −0:12 », puis « Next › » / « ‹ Previous » quand le seuil est dépassé. La pochette revient au centre au relâchement.
+  - Fonctionne en lecture Spotify, en lecture locale et en démo. Hors mode immersif, le glissement horizontal reste inchangé (55 px, changement de piste).
+
 ## v1.21.9 — 25 novembre 2026
 
 - **Volume en glissant la pochette (mode immersif / plein écran)** : un doigt posé sur la pochette qui monte ou descend change le volume (monter = plus fort). La pochette suit le doigt avec une résistance croissante, sans jamais atteindre la tique au-dessus ni le titre en dessous (6 px de marge au minimum, 120 px de course maximum), puis revient doucement au centre au relâchement. La barre de volume s'affiche pendant le geste. Le tap (pause / lecture), le glissement horizontal (piste suivante / précédente), la bande de volume sur le côté et le balayage vers le haut sous la pochette fonctionnent comme avant. Hors mode immersif, rien ne change.
