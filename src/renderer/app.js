@@ -61,6 +61,15 @@
     return "url('" + s.replace(/['"\\()\s]/g, function(c){ return encodeURIComponent(c); }) + "')";
   }
 
+  // Fades the start-up logo cover out once a real cover is in place (loaded first, so no blank flash).
+  function revealArt(url){
+    var art = document.getElementById('art');
+    if (!art || art.classList.contains('art-ready')) return;
+    var done = function(){ art.classList.add('art-ready'); };
+    if (!url) { done(); return; }
+    var im = new Image(); im.onload = done; im.onerror = done; im.src = url;
+  }
+
   // ---------------- Generated cover art ----------------
   var artCache = {};
   var hueCache = {};
@@ -1911,6 +1920,24 @@
   });
 
   (function(){
+    (function(){
+      var ub = document.getElementById('checkUpdateBtn'), un = document.getElementById('updateNote');
+      if (!ub || !un) return;
+      if (!(window.simplePlayer && window.simplePlayer.checkForUpdate)) { ub.disabled = true; un.textContent = 'Only works in the real Windows app — not in this preview.'; return; }
+      window.simplePlayer.getAppVersion().then(function(v){ un.textContent = 'Current version: ' + v; }).catch(function(){});
+      ub.addEventListener('click', function(){
+        ub.disabled = true; un.textContent = 'Checking…';
+        window.simplePlayer.checkForUpdate().then(function(r){
+          var cur = 'Current version: ' + r.current + '. ';
+          if (r.status === 'downloading') un.textContent = 'Version ' + r.version + ' found, downloading… You will be asked when it is ready to install.';
+          else if (r.status === 'ready') un.textContent = 'Version ' + r.version + ' is ready to install.';
+          else if (r.status === 'none') un.textContent = cur + 'You are up to date.';
+          else if (r.status === 'dev') un.textContent = 'Updates only work in the installed app.';
+          else un.textContent = cur + 'Could not reach GitHub. Check your internet connection and try again.';
+        }).catch(function(){ un.textContent = 'Could not check for updates.'; })
+          .then(function(){ ub.disabled = false; });
+      });
+    })();
     var btn = document.getElementById('openLogBtn');
     if (!btn) return;
     if (!(window.simplePlayer && window.simplePlayer.openLog)) { btn.disabled = true; return; }
@@ -2900,7 +2927,7 @@
     currentRealItem = t;
     lastKnownTrackId = t.id;
     var artUrl = coverUrl(t);
-    if (artUrl) $art.style.backgroundImage = cssUrl(artUrl);
+    if (artUrl) { $art.style.backgroundImage = cssUrl(artUrl); revealArt(artUrl); }
     $title.textContent = t.name;
     $artist.textContent = (t.artists || []).map(function(a){ return a.name; }).join(', ');
     $total.textContent = fmt(t.duration_ms / 1000);
@@ -2989,7 +3016,7 @@
     pendingSaved = saved;
     $title.textContent = saved.title || '';
     $artist.textContent = saved.artist || '';
-    if (saved.artUrl) { $art.style.backgroundImage = cssUrl(saved.artUrl); updateNpBackgroundReal(saved.artUrl); }
+    if (saved.artUrl) { $art.style.backgroundImage = cssUrl(saved.artUrl); revealArt(saved.artUrl); updateNpBackgroundReal(saved.artUrl); }
     if (saved.durationMs) {
       realPlaybackMeta.durationMs = saved.durationMs;
       $total.textContent = fmt(saved.durationMs / 1000);
@@ -3394,6 +3421,7 @@
       // A generated cover right away, replaced by the real one when it arrives.
       var seed = 'local:' + albumKey(t);
       $art.style.backgroundImage = cssUrl(makeArt(seed));
+      revealArt(makeArt(seed));
       bgFromSeed(seed);
       var token = ++showToken;
       cover(t, 'full').then(function(url){

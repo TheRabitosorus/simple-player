@@ -1,6 +1,6 @@
 {
   "name": "simple-player",
-  "version": "1.22.5",
+  "version": "1.22.7",
   "description": "Minimalist Spotify and local files (MP3, FLAC) player for Windows - big buttons, touch, swipe",
   "main": "src/main.js",
   "author": "Julien",

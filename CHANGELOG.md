@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## 1.22.7
+
+- **Pochette de démarrage** : au lancement, la pochette affiche le logo Simple Player (casque + play, fond sombre avec lueur verte) au lieu de l'image générée de base. Dès que la vraie pochette est connue et chargée, un fondu d'environ 0,7 s passe du logo à la pochette. Si rien n'est chargé (aucun morceau), le logo reste affiché. Mode local : fondu vers la pochette générée, puis la vraie quand elle arrive. Vérifié dans le navigateur de test ; pas sur un vrai Windows connecté à Spotify.
+
+## 1.22.6
+
+- **Réglages → Updates** : nouveau bouton « Check for updates » qui interroge GitHub tout de suite, au cas où la vérification automatique ne marche pas. Il affiche la version actuelle, « You are up to date », ou « Version X found, downloading… » (le message habituel « Install now » apparaît ensuite). Si GitHub est injoignable, un message clair l'indique. Non testé sur un vrai Windows installé (le contrôle de mise à jour ne fonctionne que dans l'application installée).
+
 ## 1.22.5
 
 - **Transition plein écran ⇄ normal** : refaite pour être un seul mouvement continu dans les deux sens (la pochette, le titre, la barre et les boutons glissent d'où ils étaient vers leur nouvelle place, au lieu de sauter quand la fenêtre change de taille). Vérifié dans un vrai Electron simulé ; pas pu être vérifié sur un vrai Windows.

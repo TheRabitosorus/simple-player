@@ -512,6 +512,29 @@ function killGhostSpotifyIfAny() {
   }
 }
 
+// Manual "Check for updates" (Settings). Same updater as the automatic check: a newer version is
+// downloaded by itself and the usual "Install now" prompt appears when it is ready.
+let updateReadyVersion = null;
+ipcMain.handle('update:version', () => app.getVersion());
+ipcMain.handle('update:check', async () => {
+  const current = app.getVersion();
+  if (!app.isPackaged) return { status: 'dev', current };
+  if (updateReadyVersion) {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:ready', updateReadyVersion);
+    return { status: 'ready', current, version: updateReadyVersion };
+  }
+  try {
+    log.info('update: manual check');
+    const res = await autoUpdater.checkForUpdates();
+    const latest = res && res.updateInfo && res.updateInfo.version;
+    if (latest && latest !== current) return { status: 'downloading', current, version: latest };
+    return { status: 'none', current, version: latest || current };
+  } catch (err) {
+    log.warn('update: manual check failed', err);
+    return { status: 'error', current };
+  }
+});
+
 ipcMain.handle('update:install', () => {
   quitSignalSent = true; // skip the pause-before-quit dance
   autoUpdater.quitAndInstall();
@@ -901,10 +924,9 @@ app.whenReady().then(() => {
     });
 
     // The app can stay open for days (tray), so also look again every 6 hours.
-    let updateReady = false;
-    autoUpdater.on('update-downloaded', () => { updateReady = true; });
+    autoUpdater.on('update-downloaded', (info) => { updateReadyVersion = info.version; });
     setInterval(() => {
-      if (updateReady) return;
+      if (updateReadyVersion) return;
       autoUpdater.checkForUpdates().catch((err) => log.warn('update: periodic check failed', err));
     }, 6 * 60 * 60 * 1000).unref();
 

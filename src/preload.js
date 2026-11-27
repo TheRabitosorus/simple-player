@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   // to install. The callback receives the new version string.
   onUpdateReady: (callback) => ipcRenderer.on('update:ready', (event, version) => callback(version)),
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  getAppVersion: () => ipcRenderer.invoke('update:version'),
 
   setFullScreen: (value) => ipcRenderer.invoke('window:set-fullscreen', value),
   isFullScreen: () => ipcRenderer.invoke('window:is-fullscreen'),
