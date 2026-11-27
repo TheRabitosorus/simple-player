@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   ghostSetEnabled: (enabled) => ipcRenderer.invoke('ghost:set-enabled', enabled),
   ghostPickExe: () => ipcRenderer.invoke('ghost:pick-exe'),
   ghostNoActiveDevice: () => ipcRenderer.invoke('ghost:no-active-device'),
+  ghostRestart: () => ipcRenderer.invoke('ghost:restart'),
 
   // Called by main just before the app quits, so the renderer can pause
   // Spotify playback gracefully before the process exits.

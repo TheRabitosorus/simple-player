@@ -767,9 +767,10 @@
   }
   // Window resized, or zoom changed (Ctrl +/-/wheel also changes the CSS size
   // of the window): rescale the interface, refit the cover, resize the background.
+  var _fitSuspended = false; // true while a window change + immersive morph is being orchestrated (see morphWithWindow)
   function onViewportChange(){
     applyUiScale();
-    fitArtSquare();
+    if (!_fitSuspended) fitArtSquare();
     refreshBg(false);
   }
   window.addEventListener('resize', onViewportChange);
@@ -784,7 +785,7 @@
       // During the idle morph the room changes on every frame: refitting then made the
       // cover shrink and re-grow. Wait until the morph is over instead.
       var wait = Math.max(80, _settleUntil - Date.now() + 40);
-      refitDebounce = setTimeout(fitArtSquare, wait);
+      refitDebounce = setTimeout(function(){ if (!_fitSuspended) fitArtSquare(); }, wait);
     });
     artRoomObserver.observe($artWrap);
     artRoomObserver.observe($trackInfo);
@@ -1591,30 +1592,7 @@
       }
     }
 
-    // Mouse-only tooltip ("Add to playlist") after the pointer rests on the + button.
-    // Our own element rather than the native `title`: it is not clipped by the button's
-    // wrapper in immersive mode, and it never shows for a finger.
-    (function(){
-      var tip = document.createElement('div');
-      tip.id = 'addTip'; tip.textContent = 'Add to playlist'; tip.hidden = true;
-      $app.appendChild(tip);
-      var timer = null;
-      function hide(){ clearTimeout(timer); tip.classList.remove('show'); tip.hidden = true; }
-      addBtn.addEventListener('pointerenter', function(e){
-        if (e.pointerType !== 'mouse') return;
-        clearTimeout(timer);
-        timer = setTimeout(function(){
-          if (!menu.hidden) return;
-          var r = addBtn.getBoundingClientRect(), a = $app.getBoundingClientRect();
-          tip.hidden = false;
-          tip.style.left = ((r.left + r.width / 2 - a.left) / uiScale) + 'px';
-          tip.style.top = ((r.top - a.top) / uiScale - tip.offsetHeight - 10) + 'px';
-          tip.classList.add('show');
-        }, 450);
-      });
-      addBtn.addEventListener('pointerleave', hide);
-      addBtn.addEventListener('pointerdown', hide);
-    })();
+    addBtn.setAttribute('data-tip', 'Add to playlist');
 
     addBtn.addEventListener('click', function(){
       if (!menu.hidden){ closeMenu(); return; }
@@ -1686,24 +1664,29 @@
     var _idleHoverZone = 4;
 
     function enterIdleFullscreen(){
+      // Resolves true if the window is about to change size (fullscreen requested).
       var sp = window.simplePlayer;
-      if (!sp || !sp.setFullScreen) return;
+      if (!sp || !sp.setFullScreen) return Promise.resolve(false);
       _idleFsWanted = true;
       // Si la fenêtre est déjà en plein écran (F11), on n'y touche pas : sinon
       // la sortie du mode idle la ferait aussi sortir du plein écran choisi.
       var already = sp.isFullScreen ? sp.isFullScreen() : Promise.resolve(false);
-      already.then(function(isFs){
-        if (isFs || !_idleFsWanted || _idleFullscreen) return;
+      return already.then(function(isFs){
+        if (isFs || !_idleFsWanted || _idleFullscreen) return false;
         _idleFullscreen = true;
         sp.setFullScreen(true);
-      }).catch(function(){});
+        return true;
+      }).catch(function(){ return false; });
     }
     function exitIdleFullscreen(){
+      // Returns true if the window is about to change size.
       _idleFsWanted = false;
       if (_idleFullscreen && window.simplePlayer && window.simplePlayer.setFullScreen){
         _idleFullscreen = false;
         window.simplePlayer.setFullScreen(false);
+        return true;
       }
+      return false;
     }
 
     // Hover en haut de fenêtre → sortir du mode idle fullscreen
@@ -1712,8 +1695,7 @@
     document.addEventListener('pointermove', function(e){
       if (e.pointerType !== 'mouse') return;
       if (_idleFullscreen && e.clientY <= _idleHoverZone){
-        exitIdleFullscreen();
-        exitIdle();
+        exitIdle(); // also leaves fullscreen
       }
     }, { passive: true });
 
@@ -1740,7 +1722,13 @@
     // So give them explicit pixel heights for the length of the morph.
     var collapsing = [document.getElementById('progressWrap'), document.getElementById('transport')];
     var heightsTimer = null;
-    function morphTo(on){
+    // Screen rectangles of the pieces that move during the switch (used to glide them from where they WERE).
+    var flipEls = ['art','trackInfo','likedBadge','progressWrap','transport','tabbar','volumeRail'].map(function(id){ return document.getElementById(id); }).filter(Boolean);
+    function snapshot(){
+      return flipEls.map(function(el){ var r = el.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height }; });
+    }
+    var _morphSeq = 0, _morphPending = false;
+    function morphTo(on, before){
       var natural = on ? collapsing.map(function(e){ return e.offsetHeight; }) : null;
       var oldW = $art.style.width, oldH = $art.style.height, oldTick = $likedBadge.style.top;
       var oldInfoMax = $trackInfo.style.maxWidth;
@@ -1758,7 +1746,16 @@
       _settleUntil = Date.now() + MORPH_MS;
       clearTimeout(heightsTimer);
       if (on) collapsing.forEach(function(e, i){ e.style.maxHeight = natural[i] + 'px'; }); // start of the collapse = current height
-      if (on) void app.offsetWidth; // eslint-disable-line no-void
+      // The swipe code leaves an inline `transition` on the cover (none, or transform/opacity only):
+      // that cancelled the width/height animation, so leaving immersive mode with a swipe made the
+      // cover jump. Give the stylesheet's transition back first.
+      $art.style.transition = '';
+      void app.offsetWidth; // eslint-disable-line no-void
+      // The window itself changed size a moment ago (fullscreen in / out), which re-laid everything out
+      // in one frame. Each piece is made to START where it was on screen, then glides to its new place
+      // with the layout morph. Done with the Web Animations API on the `translate` property: it runs on
+      // top of the CSS transitions without touching them (an inline `transition` would replace the
+      // per-state transitions of the stylesheet, and some pieces would jump).
       triggerIdleAnim(on ? 'idle-enter' : 'idle-leave');
       app.classList.toggle('idle', on);
       if (on) {
@@ -1769,14 +1766,48 @@
         collapsing.forEach(function(e, i){ e.style.maxHeight = natural[i] + 'px'; }); // ...and grow to the natural one
         heightsTimer = setTimeout(function(){ collapsing.forEach(function(e){ e.style.maxHeight = ''; }); }, MORPH_MS + 40);
       }
-      // The swipe code leaves an inline `transition` on the cover (none, or transform/opacity only):
-      // that cancelled the width/height animation, so leaving immersive mode with a swipe made the
-      // cover jump. Give the stylesheet's transition back first.
-      $art.style.transition = '';
-      void app.offsetWidth; // eslint-disable-line no-void
       $art.style.width = fin.w; $art.style.height = fin.h; $likedBadge.style.top = fin.tick; $trackInfo.style.maxWidth = fin.infoMax;
+      // The window itself changed size a moment ago (fullscreen in / out), which re-laid everything out
+      // in one frame; and switching the class also moves a few things at once (what is not animated by
+      // CSS). So measure where each piece is drawn on the FIRST frame of the morph and make it START
+      // where it was on screen before the window changed, then glide to its place with the morph.
+      // Done with the Web Animations API on `translate`: it runs on top of the CSS transitions without
+      // touching them (an inline `transition` would replace the per-state transitions of the
+      // stylesheet and some pieces would jump).
+      if (before){
+        var k = uiScale || 1;
+        var first = snapshot();
+        var ease = getComputedStyle(document.documentElement).getPropertyValue('--morph-ease').trim() || 'cubic-bezier(.4,0,.2,1)';
+        flipEls.forEach(function(el, i){
+          var b = before[i], n = first[i];
+          if (!b || !n || !b.w || !n.w) return;
+          var dx = (b.l - n.l) / k, dy = (b.t - n.t) / k;
+          if (Math.abs(dx) + Math.abs(dy) < 1) return;
+          try { el.animate([{ translate: dx + 'px ' + dy + 'px' }, { translate: '0px 0px' }], { duration: MORPH_MS - 20, easing: ease }); } catch (e) {}
+        });
+      }
       clearTimeout(refitTimer);
-      refitTimer = setTimeout(fitArtSquare, MORPH_MS + 30); // safety pass: no change expected
+      refitTimer = setTimeout(function(){ _fitSuspended = false; _morphPending = false; fitArtSquare(); }, MORPH_MS + 30); // safety pass: no change expected
+    }
+    // Enter / leave immersive mode WITH the window change (fullscreen). Order matters:
+    // 1. remember where everything is, 2. ask for the window change, 3. when the window has
+    // resized (inside that same event, before anything is painted) run the morph, gliding each piece
+    // from its old place. Without a window change (browser, already fullscreen) it runs at once.
+    function morphWithWindow(on){
+      var seq = ++_morphSeq;
+      var before = snapshot();
+      _fitSuspended = true; _morphPending = true;
+      var resized = new Promise(function(res){
+        var tm = setTimeout(done, 500);
+        function done(){ clearTimeout(tm); window.removeEventListener('resize', done); res(); }
+        window.addEventListener('resize', done);
+      });
+      var req = on ? enterIdleFullscreen() : Promise.resolve(exitIdleFullscreen());
+      req.then(function(changing){
+        if (seq !== _morphSeq) return;
+        if (!changing){ morphTo(on); return; }
+        resized.then(function(){ if (seq === _morphSeq) morphTo(on, before); });
+      });
     }
     function refitNowAndAfterMorph(){
       fitArtSquare();
@@ -1785,16 +1816,14 @@
     }
     function clear(){
       if (timer){ clearTimeout(timer); timer = null; }
-      exitIdleFullscreen();
-      if (!app.classList.contains('idle')) return; // nothing to undo
-      morphTo(false);
+      if (!app.classList.contains('idle')){ exitIdleFullscreen(); return; } // nothing to undo
+      morphWithWindow(false);
     }
     function schedule(){
       if (timer) clearTimeout(timer);
       timer = setTimeout(function(){
-        if (isPlayerActive()){
-          morphTo(true);
-          enterIdleFullscreen();
+        if (isPlayerActive() && !app.classList.contains('idle') && !_morphPending){
+          morphWithWindow(true);
         }
       }, settings.idleDelay);
     }
@@ -1813,10 +1842,8 @@
     function exitIdle(){
       // Explicit dismissal (double-tap or hover haut). Unlike clear(), this
       // re-arms the timer so immersive mode can re-engage after another idle period.
-      exitIdleFullscreen();
-      if (app.classList.contains('idle')){
-        morphTo(false);
-      }
+      if (app.classList.contains('idle')) morphWithWindow(false);
+      else exitIdleFullscreen();
       schedule();
     }
     ['pointerdown','pointermove','keydown','wheel'].forEach(function(ev){
@@ -3091,6 +3118,53 @@
     refreshPlaylistIndex(); // which of my playlists hold which track (for the tick), in background
   }
 
+  // ---------------- Tooltips ----------------
+  // One dark pill for every button, mouse only (never for a finger). Text comes from `data-tip`;
+  // a native `title` is moved there the first time the pointer reaches it (the badge's title is
+  // rewritten as the track changes), so the grey system tooltip never shows.
+  (function(){
+    var tip = document.createElement('div');
+    tip.id = 'tip'; tip.hidden = true;
+    $app.appendChild(tip);
+    var timer = null, current = null;
+    function adopt(el){
+      var t = el.getAttribute('title');
+      if (t) { el.setAttribute('data-tip', t); el.removeAttribute('title'); }
+      return el.getAttribute('data-tip');
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[title]'), adopt);
+    function hide(){ clearTimeout(timer); current = null; tip.classList.remove('show'); tip.hidden = true; }
+    function show(el){
+      var text = adopt(el);
+      if (!text || !document.body.contains(el)) return;
+      tip.textContent = text; tip.hidden = false;
+      var r = el.getBoundingClientRect(), a = $app.getBoundingClientRect();
+      var k = uiScale || 1, w = tip.offsetWidth, h = tip.offsetHeight, areaW = $app.offsetWidth;
+      var cx = (r.left + r.width / 2 - a.left) / k;
+      cx = Math.max(w / 2 + 6, Math.min(areaW - w / 2 - 6, cx));
+      var top = (r.top - a.top) / k - h - 10;
+      if (top < 6) top = (r.bottom - a.top) / k + 10; // no room above: show below
+      tip.style.left = cx + 'px'; tip.style.top = top + 'px';
+      tip.classList.add('show');
+    }
+    document.addEventListener('pointerover', function(e){
+      if (e.pointerType !== 'mouse') return;
+      var el = e.target.closest ? e.target.closest('[data-tip],[title]') : null;
+      if (el === current) return;
+      hide();
+      if (!el) return;
+      current = el; adopt(el);
+      timer = setTimeout(function(){ show(el); }, 450);
+    });
+    document.addEventListener('pointerout', function(e){
+      if (!current) return;
+      if (e.relatedTarget && current.contains(e.relatedTarget)) return;
+      hide();
+    });
+    ['pointerdown', 'wheel', 'keydown', 'scroll'].forEach(function(ev){ document.addEventListener(ev, hide, true); });
+    window.addEventListener('blur', hide);
+  })();
+
   // ---------------- "Play on this computer only" ----------------
   // With Ghost Spotify on, music must come out of THIS computer, never a
   // phone or speaker that happened to be the last active device. So:
@@ -3129,6 +3203,8 @@
           showToast('Starting Spotify on this computer…');
           window.simplePlayer.ghostNoActiveDevice();
         }
+        // Still nothing after ~12 s: our hidden Spotify is stuck or was closed by hand. Restart it once.
+        if (i === 5 && window.simplePlayer.ghostRestart) window.simplePlayer.ghostRestart();
         await sleep(2500);
       }
       throw new Error('LOCAL_DEVICE_TIMEOUT');

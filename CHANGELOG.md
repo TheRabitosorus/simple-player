@@ -2,6 +2,14 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## 1.22.5
+
+- **Transition plein écran ⇄ normal** : refaite pour être un seul mouvement continu dans les deux sens (la pochette, le titre, la barre et les boutons glissent d'où ils étaient vers leur nouvelle place, au lieu de sauter quand la fenêtre change de taille). Vérifié dans un vrai Electron simulé ; pas pu être vérifié sur un vrai Windows.
+- **Info-bulles** : tous les boutons utilisent maintenant la même pastille sombre que le bouton « + » (souris seulement, après un court délai, jamais au doigt). Plus de bulle grise système.
+- **Spotify caché** : la fenêtre (et son icône dans la barre des tâches) est maintenant masquée en continu tant que Simple Player tourne, pas seulement les 90 premières secondes.
+- **Son après fermeture manuelle de Spotify** : si le Spotify caché est fermé à la main, il est relancé automatiquement (toujours caché) ; s'il tourne mais n'apparaît jamais comme appareil de lecture, il est redémarré une fois. Non vérifié sur un vrai Windows.
+- Nouveau test automatique des info-bulles.
+
 ## v1.22.4 — 27 novembre 2026
 
 - **Fond animé avec plus de relief** (variante « B ») : base plus sombre, taches de lumière plus serrées et plus définies, couleurs de la pochette un peu plus saturées (×1,3), voile sombre moins opaque (0,18 → 0,08). Contraste entre zones claires et sombres mesuré : 0,71 → 0,83 sur le rendu de test en démo. La lisibilité du texte reste bonne (ratios 4,3 à 12 sur 3 tailles de fenêtre). Non vérifié avec de vraies pochettes. La vitesse reste réglable dans Réglages → Animated Background.

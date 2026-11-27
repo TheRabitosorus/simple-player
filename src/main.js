@@ -388,12 +388,22 @@ function watchAndHideSpotify(seconds) {
     '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);',
     '}',
     '"@',
-    '$end = (Get-Date).AddSeconds(' + Math.max(5, Math.floor(seconds)) + ')',
-    'while ((Get-Date) -lt $end) {',
+    // Fast (200 ms) for the first `seconds`, then every second for as long as Simple Player
+    // lives: Spotify may bring its window (and its taskbar icon) back later on its own.
+    // It ends by itself if Simple Player is gone (crash), so it can never be left behind.
+    '$fastEnd = (Get-Date).AddSeconds(' + Math.max(5, Math.floor(seconds)) + ')',
+    '$parent = ' + process.pid,
+    '$n = 0',
+    'while ($true) {',
     '  Get-Process -Name Spotify -ErrorAction SilentlyContinue | ForEach-Object {',
     '    if ($_.MainWindowHandle -ne [IntPtr]::Zero) { [void][SPHide]::ShowWindow($_.MainWindowHandle, 0) }',
     '  }',
-    '  Start-Sleep -Milliseconds 200',
+    '  if ((Get-Date) -lt $fastEnd) { Start-Sleep -Milliseconds 200 }',
+    '  else {',
+    '    Start-Sleep -Milliseconds 1000',
+    '    $n++',
+    '    if ($n % 5 -eq 0 -and -not (Get-Process -Id $parent -ErrorAction SilentlyContinue)) { break }',
+    '  }',
     '}'
   ].join('\n');
   hiderProc = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], { windowsHide: true }, () => {
@@ -415,8 +425,15 @@ function isSpotifyRunning() {
 }
 
 async function launchGhostSpotify() {
-  if (ghostLaunched) return; // already launched one this session
   if (process.platform !== 'win32') return;
+  if (ghostLaunched) {
+    // Launched earlier this session. If the user has since closed it (from its taskbar icon, say),
+    // it is gone: start a fresh one instead of waiting for a device that will never come back.
+    if (await isSpotifyRunning()) return;
+    log.info('ghost: Spotify was closed, starting it again');
+    ghostLaunched = false;
+    ghostKillDone = false;
+  }
   if (await isSpotifyRunning()) {
     // Already up: its Connect device will show by itself. If WE started it in
     // an earlier session that ended abnormally (crash, killed from the Task
@@ -801,6 +818,24 @@ ipcMain.handle('ghost:pick-exe', async () => {
 });
 ipcMain.handle('ghost:no-active-device', () => {
   if (store.get('ghostSpotifyEnabled')) launchGhostSpotify();
+});
+// The hidden Spotify is running but never shows up as a playback device (it got stuck, or was left
+// half-closed by hand): close OUR copy and start a clean one. Never touches a Spotify we did not start.
+let ghostRestartAt = 0;
+ipcMain.handle('ghost:restart', async () => {
+  if (!store.get('ghostSpotifyEnabled') || process.platform !== 'win32') return false;
+  if (!ghostLaunched && !store.get('ghostOwned')) return false;
+  if (Date.now() - ghostRestartAt < 30000) return false; // at most once every 30 s
+  ghostRestartAt = Date.now();
+  log.info('ghost: no playback device, restarting our Spotify');
+  try { if (hiderProc) hiderProc.kill(); } catch (err) {}
+  hiderProc = null;
+  try { execFileSync('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 }); } catch (err) {}
+  await new Promise((r) => setTimeout(r, 1500));
+  ghostLaunched = false;
+  ghostKillDone = false;
+  await launchGhostSpotify();
+  return true;
 });
 
 // Disable Windows Communications Ducking (the feature that lowers all other

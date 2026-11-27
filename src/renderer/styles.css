@@ -479,11 +479,11 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 #dialogBox .dlg-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;}
 #dialogBox .dlg-actions button{padding:10px 16px;border-radius:12px;background:var(--bg-elev-2);color:var(--fg);font-weight:700;font-size:13px;}
 #dialogBox .dlg-actions button.primary{background:var(--accent);color:#0a0c0c;}
-/* Tooltip of the + button (mouse only, see app.js). */
-#addTip{position:absolute;z-index:60;transform:translateX(-50%);pointer-events:none;white-space:nowrap;
+/* Tooltips (mouse only, see app.js): one dark pill for every button. */
+#tip{position:absolute;z-index:60;transform:translateX(-50%);pointer-events:none;white-space:nowrap;max-width:90%;
   padding:7px 14px;border-radius:999px;background:rgba(0,0,0,.82);color:#fff;font-size:15px;font-weight:600;
   opacity:0;transition:opacity .12s ease;}
-#addTip.show{opacity:1;}
+#tip.show{opacity:1;}
 #toast{
   position:fixed;left:50%;bottom:92px;transform:translateX(-50%);
   background:var(--bg-elev-2);border:1px solid var(--border);color:var(--fg);
