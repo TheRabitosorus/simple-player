@@ -2,6 +2,45 @@
 
 Ce fichier résume ce qui change à chaque fois que je te donne une nouvelle version à envoyer sur GitHub.
 
+## v1.22.4 — 27 novembre 2026
+
+- **Fond animé avec plus de relief** (variante « B ») : base plus sombre, taches de lumière plus serrées et plus définies, couleurs de la pochette un peu plus saturées (×1,3), voile sombre moins opaque (0,18 → 0,08). Contraste entre zones claires et sombres mesuré : 0,71 → 0,83 sur le rendu de test en démo. La lisibilité du texte reste bonne (ratios 4,3 à 12 sur 3 tailles de fenêtre). Non vérifié avec de vraies pochettes. La vitesse reste réglable dans Réglages → Animated Background.
+
+## v1.22.3 — 27 novembre 2026
+
+- **Animation du fond plus légère** : le fond est dessiné à la moitié de la taille de la fenêtre (avant : au moins 2×, jusqu'à ~8 millions de pixels par image à 1280×1920) puis étiré par le navigateur. Environ 16× moins de pixels à dessiner par image (mesuré en test sans carte graphique : 80 ms → 5 ms). Rendu comparé sur une capture : différence moyenne 0,2 niveau sur 255, maximum 4 (invisible). Gain réel sur ton PC (CPU/batterie) non mesuré.
+
+## v1.22.2 — 27 novembre 2026
+
+- **Bulle d'aide du bouton « + »** : avec la souris, après 0,45 s sur le bouton, une petite bulle « Add to playlist » apparaît au-dessus. Jamais au toucher. Aucun autre changement visuel (le bouton reste tel quel). Remplace l'infobulle native du navigateur.
+
+## v1.22.1 — 27 novembre 2026
+
+Lisibilité et finitions (aucun changement de gestes).
+
+- **Contraste** : le fond teinté par la pochette pouvait être gris clair derrière l'artiste, le temps et les boutons (ratio mesuré 1,0 à 2,0 sur une capture de test ; le minimum recommandé est 4,5). Ajout d'un voile sombre progressif en bas de l'écran et de textes plus clairs (artiste, temps, shuffle/repeat éteints). Après correction, mesuré entre 3,6 et 10 selon la fenêtre (3,6 sur le temps en fenêtre large, à surveiller).
+- **Barre de progression** plus épaisse (8 → 12 px) et plus visible. La zone tactile était déjà large (invisible autour de la barre) : inchangée.
+- **Pochette plus grande** : elle grandit avec la fenêtre (jusqu'à 760 px, 85 % de la largeur libre) au lieu de s'arrêter à 520 px, ce qui réduit le grand vide au-dessus du titre sur les fenêtres hautes ; pareil en mode immersif.
+- **Transition normal ↔ immersif plus fluide** (mesurée image par image) : avant, la pochette rétrécissait un peu puis, à 0,6 s, repartait pour grandir (deux mouvements, ~1,2 s) et la tique sautait de 37 px en une image ; en sortant par un balayage vers le haut, la pochette sautait carrément (l'animation de taille était désactivée par le code des gestes). Maintenant la mise en page finale est mesurée d'abord, puis la pochette et la tique glissent directement vers leur place en un seul mouvement de 0,6 s, dans les deux sens. Non vérifié : le vrai passage en plein écran de la fenêtre Windows (le redimensionnement du système se produit en même temps).
+- **Messages d'erreur** réécrits en langage clair : échec de connexion Spotify (annulée, trop long, refusée… le détail technique va dans le journal), refus 403 (Premium / compte non autorisé), erreurs 401 et 5xx, Spotify qui ne démarre pas, réseau.
+
+## v1.22.0 — 27 novembre 2026
+
+Version de consolidation (aucune fonction visible ajoutée) : fiabilité, vie privée, maintenance.
+
+- **Journal** : l'app écrit maintenant un fichier `simple-player.log` (dossier de données de l'app, 512 Ko max avec rotation) : mises à jour (vérification, erreurs), lancement/arrêt de Spotify fantôme, erreurs de l'app. Réglages → Diagnostics → « Open log file ». Aucun jeton ni contenu de fichier n'y est écrit.
+- **Polices embarquées** (Fraunces, Manrope, JetBrains Mono, licence SIL OFL) : plus aucune requête vers Google au lancement, même rendu hors ligne. La politique de sécurité (CSP) n'autorise plus Google Fonts.
+- **Mises à jour** : en plus de la vérification au démarrage, nouvelle vérification toutes les 6 h tant que l'app reste ouverte.
+- **Spotify fantôme** : l'app ne ferme plus que le Spotify qu'**elle a lancé** (ton propre Spotify ouvert avant n'est plus fermé ; la lecture reste mise en pause via l'API). Si l'app s'est arrêtée brutalement et a laissé un Spotify caché, il est repris en charge (caché puis fermé) au lancement suivant. Cas limite : si tu as ouvert toi-même Spotify après un tel plantage, il peut être pris pour l'orphelin.
+- **Code découpé** : `index.html` (4500 lignes) → `index.html` + `styles.css` + `app.js`. Rendu vérifié pixel pour pixel identique. La CSP n'autorise maintenant que les scripts du fichier `app.js` (plus de script en ligne). Le contenu de `app.js` reste un seul bloc : le découper en modules demanderait une vraie refonte (état partagé).
+- **Tests** dans le dépôt (`tests/`, `npm test`) : disposition de la pochette, glisser vertical (volume), balayage horizontal/défilement continu, survol tactile vs souris, tap.
+- `deploy.bat` supprime l'ancien dossier imbriqué `simple-player\simple-player` (doublon périmé) ; description du paquet en anglais.
+
+## v1.21.12 — 26 novembre 2026
+
+- **Fenêtre du Spotify « fantôme » cachée beaucoup plus vite** : avant, la fenêtre n'était cachée qu'à 3, 6, 10 et 15 secondes après le lancement, donc visible entre-temps. Maintenant, un petit processus PowerShell démarre juste avant Spotify et vérifie toutes les 200 ms (pendant 90 s) si Spotify a une fenêtre visible, et la cache aussitôt. Il s'arrête tout seul, ne fait aucune énumération de fenêtres (peu de CPU) et les anciens masquages restent en secours. Le lancement demande aussi à Windows de démarrer Spotify sans fenêtre (`windowsHide`). Non testé sur Windows depuis mon environnement : à confirmer à l'usage. Ne s'applique que quand Simple Player lance lui-même Spotify (si Spotify tourne déjà, rien n'est caché).
+- **Fermeture : tous les processus sont arrêtés** (bouton Quitter du tray ou croix de la fenêtre) : l'arrêt de Spotify (`taskkill /T /F`, avec ses sous-processus) est maintenant **synchrone** (avant, il pouvait être perdu si l'app se fermait avant la fin), le petit processus PowerShell qui cache la fenêtre est arrêté lui aussi, et un nettoyage de dernier recours s'exécute à toute sortie de l'app. Si la fermeture se bloque, un garde-fou force l'arrêt après 6 s. Les petits processus PowerShell ne montrent plus de console.
+
 ## v1.21.11 — 25 novembre 2026
 
 - **Défilement continu dans la piste avec la pochette (mode immersif)** : en dessous de 30 % de la largeur de la pochette, ce n'est plus un saut au relâchement. Tant que tu gardes la pochette décalée, la lecture avance (vers la droite) ou recule (vers la gauche), même si ton doigt ne bouge plus. Plus tu décales la pochette, plus ça va vite : environ 8 s de piste par seconde à 30 % du seuil, 18 s/s à 60 %, jusqu'à 30 s/s juste avant le changement de piste. Au centre (moins de 12 px) rien ne bouge. La pastille affiche le total « +0:24 » / « −0:12 » depuis le début du geste. La position est envoyée régulièrement pendant le geste (toutes les 200 ms en lecture locale, toutes les 700 ms avec Spotify) et une dernière fois au relâchement. Au-delà de 30 %, relâcher change toujours de piste.

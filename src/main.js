@@ -2,11 +2,12 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, dialog, screen, sh
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
-const { spawn, execFile } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const spotifyAuth = require('./spotifyAuth');
 const localMusic = require('./localMusic');
+const log = require('./log');
 const { pathToFileURL } = require('url');
 
 // IMPORTANT: pin the app name before anything reads app.getPath('userData').
@@ -197,6 +198,13 @@ function createWindow() {
   // resizes, or closes the window, so it reopens exactly where it was.
   // (saveBounds is the module-level function declared above.)
   mainWindow.on('resize', saveBoundsSoon);
+  // Renderer console errors/warnings go to the log too (level 3 = error).
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    if (event && typeof event === 'object' && event.level !== undefined) { // newer Electron: details object
+      level = event.level; message = event.message; line = event.lineNumber;
+    }
+    if (level === 3 || level === 'error') log.error('renderer: ' + message + ' (line ' + line + ')');
+  });
   mainWindow.on('move', saveBoundsSoon);
   mainWindow.on('maximize', () => store.set('windowMaximized', true));
   mainWindow.on('unmaximize', () => store.set('windowMaximized', false));
@@ -355,10 +363,42 @@ function hideSpotifyWindows() {
     '  return $true',
     '}, [IntPtr]::Zero) | Out-Null'
   ].join('\n');
-  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], () => {
+  execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], { windowsHide: true }, () => {
     // Best-effort only: if this fails (PowerShell blocked, API shape
     // changed by a Windows/Spotify update, etc.) Spotify just stays
     // visible/minimized instead of fully hidden — not a crash.
+  });
+}
+
+// Fast hider: one short-lived PowerShell that, for `seconds`, checks every
+// 200 ms whether any Spotify process has a visible main window and hides it.
+// Started BEFORE Spotify is launched, so the window is gone almost as soon as
+// it appears (the timed calls above only fire at 3 s, 6 s, ...). It uses
+// Process.MainWindowHandle (no window enumeration), so it stays cheap, and it
+// exits by itself. The timed calls above stay as a fallback.
+let hiderProc = null;
+function watchAndHideSpotify(seconds) {
+  if (process.platform !== 'win32') return;
+  try { if (hiderProc) hiderProc.kill(); } catch (err) {}
+  const script = [
+    'Add-Type @"',
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public class SPHide {',
+    '  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);',
+    '}',
+    '"@',
+    '$end = (Get-Date).AddSeconds(' + Math.max(5, Math.floor(seconds)) + ')',
+    'while ((Get-Date) -lt $end) {',
+    '  Get-Process -Name Spotify -ErrorAction SilentlyContinue | ForEach-Object {',
+    '    if ($_.MainWindowHandle -ne [IntPtr]::Zero) { [void][SPHide]::ShowWindow($_.MainWindowHandle, 0) }',
+    '  }',
+    '  Start-Sleep -Milliseconds 200',
+    '}'
+  ].join('\n');
+  hiderProc = execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], { windowsHide: true }, () => {
+    hiderProc = null;
+    // Best-effort: if it fails, the timed fallback above still hides the window.
   });
 }
 
@@ -377,14 +417,32 @@ function isSpotifyRunning() {
 async function launchGhostSpotify() {
   if (ghostLaunched) return; // already launched one this session
   if (process.platform !== 'win32') return;
-  if (await isSpotifyRunning()) return; // already up: its Connect device will show by itself
+  if (await isSpotifyRunning()) {
+    // Already up: its Connect device will show by itself. If WE started it in
+    // an earlier session that ended abnormally (crash, killed from the Task
+    // Manager), it is an orphan: take ownership again so it gets hidden and
+    // closed with the app. Otherwise it is the user's own Spotify: hands off.
+    if (store.get('ghostOwned')) {
+      ghostLaunched = true;
+      ghostKillDone = false;
+      log.info('ghost: adopted a Spotify left over from a previous session');
+      watchAndHideSpotify(30);
+    } else {
+      log.info('ghost: Spotify already running (not ours), left untouched');
+    }
+    return;
+  }
   if (ghostLaunched) return; // another call won the race while we checked
   ghostLaunched = true;
+  store.set('ghostOwned', true); // survives a crash, so the next launch can clean up
+  log.info('ghost: launching Spotify');
   try {
+    ghostKillDone = false;
+    watchAndHideSpotify(90); // catches the window the moment Spotify shows it
     const exe = resolveSpotifyExePath();
     if (exe) {
       // Classic installer: start Spotify.exe directly, minimized.
-      const child = spawn(exe, ['--minimized'], { detached: true, stdio: 'ignore' });
+      const child = spawn(exe, ['--minimized'], { detached: true, stdio: 'ignore', windowsHide: true });
       child.on('error', () => {});
       child.unref();
     } else {
@@ -400,17 +458,41 @@ async function launchGhostSpotify() {
     });
   } catch (err) {
     ghostLaunched = false;
+    store.set('ghostOwned', false);
+    log.error('ghost: launch failed', err);
     // Silent: the renderer's "Starting Spotify..." wait then times out and
     // the user gets a clear message.
   }
 }
 
+let ghostKillDone = false;
 function killGhostSpotifyIfAny() {
+  const wasOurs = ghostLaunched;
   ghostLaunched = false;
+  if (ghostKillDone) return; // already cleaned up (called from several quit paths)
+  ghostKillDone = true;
   // Kill Spotify whenever Ghost is enabled — whether we launched it this
   // session or it was already running. This ensures music stops on quit.
+  // Stop our own PowerShell helpers first (window hider).
+  try { if (hiderProc) hiderProc.kill(); } catch (err) {}
+  hiderProc = null;
   if (!store.get('ghostSpotifyEnabled')) return;
-  execFile('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], () => {});
+  if (process.platform !== 'win32') return;
+  // Only close a Spotify that WE started. The user's own Spotify (opened
+  // before Simple Player) is left alone; playback on it is paused through
+  // the Spotify API by the quit sequence.
+  if (!wasOurs) { log.info('ghost: Spotify not started by us, not closing it'); return; }
+  // SYNCHRONOUS on purpose: the app is about to exit, and a fire-and-forget
+  // taskkill can be lost if we exit before it has finished. /T also kills
+  // Spotify's child processes (renderer, GPU, crashpad...). Exit code 128
+  // just means "no Spotify.exe running", which is fine.
+  try {
+    execFileSync('taskkill', ['/IM', 'Spotify.exe', '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 });
+    log.info('ghost: Spotify processes stopped');
+    store.set('ghostOwned', false);
+  } catch (err) { /* nothing to kill (exit code 128), or already gone */
+    store.set('ghostOwned', false);
+  }
 }
 
 ipcMain.handle('update:install', () => {
@@ -666,9 +748,21 @@ ipcMain.handle('spotify:connect', async () => {
     await spotifyAuth.startLogin();
     return { connected: true };
   } catch (err) {
-    return { connected: false, error: err.message };
+    log.error('spotify: sign-in failed', err);
+    return { connected: false, error: friendlySignInError(err) };
   }
 });
+// Plain-language text for the Settings page; the raw technical detail goes to the log file.
+function friendlySignInError(err) {
+  const m = String((err && err.message) || '');
+  if (/timed out/i.test(m)) return 'Sign-in took too long (5 minutes). Press Connect again and finish signing in in your browser.';
+  if (/access_denied|cancel/i.test(m)) return 'Sign-in was cancelled. Press Connect to try again.';
+  if (/state mismatch/i.test(m)) return 'The sign-in response did not match this attempt. Press Connect and use the new browser tab that opens.';
+  if (/Token exchange failed/i.test(m)) return 'Spotify did not accept the sign-in. Try again; if it keeps failing, open the log file in Settings (Diagnostics).';
+  if (/EADDRINUSE/i.test(m)) return 'Another program is using the port needed for sign-in. Close other copies of Simple Player and try again.';
+  if (/fetch failed|ENOTFOUND|ECONN|network/i.test(m)) return 'Could not reach Spotify. Check your internet connection and try again.';
+  return 'Sign-in failed. Try again; if it keeps failing, open the log file in Settings (Diagnostics).';
+}
 ipcMain.handle('spotify:disconnect', () => {
   spotifyAuth.disconnect();
   return { connected: false };
@@ -759,15 +853,29 @@ app.whenReady().then(() => {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = false;
 
+    autoUpdater.on('checking-for-update', () => log.info('update: checking (current ' + app.getVersion() + ')'));
+    autoUpdater.on('update-available', (info) => log.info('update: available ' + info.version));
+    autoUpdater.on('update-not-available', () => log.info('update: none available'));
+    autoUpdater.on('error', (err) => log.error('update: error', err));
     autoUpdater.on('update-downloaded', (info) => {
+      log.info('update: downloaded ' + info.version);
       // Tell the renderer a new version is ready — it will show the prompt.
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('update:ready', info.version);
       }
     });
 
-    autoUpdater.checkForUpdates().catch(() => {
-      // Silent failure (offline, GitHub unreachable, etc.).
+    // The app can stay open for days (tray), so also look again every 6 hours.
+    let updateReady = false;
+    autoUpdater.on('update-downloaded', () => { updateReady = true; });
+    setInterval(() => {
+      if (updateReady) return;
+      autoUpdater.checkForUpdates().catch((err) => log.warn('update: periodic check failed', err));
+    }, 6 * 60 * 60 * 1000).unref();
+
+    autoUpdater.checkForUpdates().catch((err) => {
+      // Not shown to the user (offline, GitHub unreachable...), but logged.
+      log.warn('update: check failed', err);
     });
   }
 
@@ -797,6 +905,12 @@ app.on('before-quit', (event) => {
     quitSignalSent = true;
     isQuitting = true;
     mainWindow.webContents.send('app:will-quit');
+    // Watchdog: if anything stalls the normal quit (hung renderer, blocked
+    // handler), clean up and force the process to end after 6 s.
+    setTimeout(() => {
+      try { stopVolumeHelper(); killGhostSpotifyIfAny(); } catch (e) {}
+      app.exit(0);
+    }, 6000).unref();
     setTimeout(() => {
       stopVolumeHelper();
       // Kill Ghost Spotify last, after the pause has had time to land.
@@ -812,6 +926,29 @@ app.on('before-quit', (event) => {
   isQuitting = true;
   killGhostSpotifyIfAny();
   stopVolumeHelper();
+});
+
+process.on('uncaughtException', (err) => log.error('uncaughtException', err));
+process.on('unhandledRejection', (err) => log.error('unhandledRejection', err));
+
+ipcMain.handle('log:open', async () => {
+  const p = log.path();
+  try { if (!fs.existsSync(p)) fs.writeFileSync(p, ''); } catch (e) {}
+  const err = await shell.openPath(p);
+  if (err) { shell.showItemInFolder(p); }
+  return true;
+});
+
+// Last-resort cleanup on ANY exit path (crash handler, forced exit, logoff):
+// the 'exit' event runs synchronously just before the process ends. Both
+// helpers are no-ops if already cleaned up.
+process.on('exit', () => {
+  try { stopVolumeHelper(); } catch (err) {}
+  try { killGhostSpotifyIfAny(); } catch (err) {}
+});
+app.on('will-quit', () => {
+  stopVolumeHelper();
+  killGhostSpotifyIfAny();
 });
 
 // Intentionally no 'window-all-closed' handler: registering one (even an

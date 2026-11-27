@@ -10,8 +10,13 @@ simple-player/
 │   ├── main.js          → Processus principal Electron (fenêtre, tray, raccourcis, mises à jour)
 │   ├── preload.js        → Pont sécurisé entre main.js et l'interface
 │   ├── config.js          → Identifiants/paramètres de connexion Spotify (Client ID, redirect URI)
+│   ├── log.js              → Journal (simple-player.log dans le dossier de données de l'app)
 │   └── renderer/
-│       └── index.html      → Toute l'interface (HTML + CSS + JS) : lecteur, bibliothèque, recherche, réglages
+│       ├── index.html      → Structure HTML de l'interface
+│       ├── styles.css      → Tout le style
+│       ├── app.js          → Toute la logique de l'interface (lecteur, bibliothèque, recherche, réglages, gestes)
+│       └── fonts/          → Polices embarquées (licences SIL OFL incluses)
+├── tests/                  → Tests de l'interface (Chrome headless) : `cd tests && npm install && npm test`
 ├── build/
 │   ├── icon.ico            → Icône Windows (multi-résolutions), utilisée par l'installeur et la fenêtre
 │   ├── icon_tray.png         → Icône pour la zone de notification (même design, plus petit)
@@ -43,13 +48,13 @@ Les paramètres de connexion à Spotify : l'identifiant de l'application (Client
 ### `src/spotifyAuth.js`
 La vraie connexion à Spotify : ouvre la page de connexion officielle dans ton navigateur, reçoit la réponse via un petit serveur local temporaire, échange le code contre les jetons d'accès, et conserve le jeton de rafraîchissement **chiffré** sur ton disque (via le coffre-fort intégré de Windows) pour que tu n'aies pas à te reconnecter à chaque lancement.
 
-### Lecture réelle (dans `src/renderer/index.html`)
+### Lecture réelle (dans `src/renderer/app.js`)
 Une fois connecté, Simple Player agit comme une télécommande + afficheur pour ton compte Spotify — exactement comme quand tu ouvres l'app officielle Spotify sur un appareil qui ne fait pas jouer le son lui-même (ton ordi, par exemple, pendant que la musique sort de ton téléphone ou d'une enceinte). Les boutons play/pause/suivant/précédent/volume/shuffle/repeat envoient de vraies commandes à l'appareil actuellement actif (peu importe lequel), et l'app interroge l'état réel de ton compte toutes les 2 secondes pour afficher ce qui joue vraiment, où que ce soit.
 
 ### `src/localMusic.js`
 Fichiers de musique de l'ordinateur (onglet « Local ») : parcourt les dossiers ajoutés et lit les tags MP3 (ID3v2) et FLAC, la qualité, la durée et les pochettes. La lecture elle-même est faite par la fenêtre (élément audio de Chromium : MP3, FLAC, WAV, OGG, Opus, M4A/AAC).
 
-### `src/renderer/index.html`
+### `src/renderer/` (index.html, styles.css, app.js)
 Toute l'interface que tu vois et utilises : la pochette d'album, les boutons de lecture, le swipe tactile, la barre de volume, la bibliothèque, la recherche, et les réglages. C'est ce fichier qui gère l'affichage et qui, une fois la connexion Spotify branchée, parlera à ton compte Spotify.
 
 ### `package.json`

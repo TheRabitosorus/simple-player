@@ -23,6 +23,12 @@ if errorlevel 1 (
 
 cd /d "%DEST%"
 
+REM Ancienne copie imbriquee (simple-player\simple-player) : doublon perime, on la supprime.
+if exist "%DEST%\simple-player\src\main.js" (
+  echo Suppression de l'ancien dossier imbrique simple-player\simple-player ...
+  rmdir /s /q "%DEST%\simple-player"
+)
+
 echo.
 echo Envoi vers GitHub...
 git add -A

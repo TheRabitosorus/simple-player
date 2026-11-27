@@ -1,0 +1,7 @@
+{
+  "name": "simple-player-tests",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": { "test": "node run-all.js" },
+  "dependencies": { "playwright-core": "^1.65.1" }
+}

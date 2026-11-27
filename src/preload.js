@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('simplePlayer', {
   getLaunchAtStartup: () => ipcRenderer.invoke('settings:get-launch-at-startup'),
   setLaunchAtStartup: (enabled) => ipcRenderer.invoke('settings:set-launch-at-startup', enabled),
 
+  openLog: () => ipcRenderer.invoke('log:open'),
   saveWindowPositionNow: () => ipcRenderer.invoke('window:save-position-now'),
   restoreSavedWindowPosition: () => ipcRenderer.invoke('window:restore-saved-position'),
 
